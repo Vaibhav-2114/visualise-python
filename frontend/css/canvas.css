@@ -1,0 +1,106 @@
+/* Canvas Viewport and Layout Styling */
+
+#canvas-viewport {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  min-height: 500px;
+  overflow: hidden;
+  user-select: none;
+  -webkit-user-select: none;
+  touch-action: none;
+  background-color: #0b0f19;
+  background-image: radial-gradient(#1e293b 1.5px, transparent 1.5px);
+  background-size: 24px 24px;
+}
+
+#canvas-world {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  transform-origin: 0 0;
+  will-change: transform;
+}
+
+#connections-layer {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  pointer-events: none;
+  z-index: 1;
+}
+
+#nodes-layer {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: auto;
+  z-index: 2;
+}
+
+/* Floating Zoom & Pan Toolbar */
+.canvas-toolbar {
+  position: absolute;
+  bottom: 24px;
+  right: 24px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(15, 23, 42, 0.85);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  padding: 6px;
+  border-radius: 8px;
+  border: 1px solid rgba(51, 65, 85, 0.8);
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.4), 0 4px 6px -4px rgba(0, 0, 0, 0.3);
+  z-index: 50;
+}
+
+.canvas-toolbar button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 32px;
+  min-width: 32px;
+  padding: 0 10px;
+  background: #1e293b;
+  color: #cbd5e1;
+  border: 1px solid #334155;
+  border-radius: 6px;
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  outline: none;
+  user-select: none;
+  transition: all 0.15s ease-in-out;
+}
+
+.canvas-toolbar button:hover {
+  background: #334155;
+  color: #f8fafc;
+  border-color: #6366f1;
+}
+
+.canvas-toolbar button:active {
+  background: #475569;
+  transform: translateY(1px);
+}
+
+.canvas-toolbar button.btn-primary {
+  background: #4338ca;
+  color: #ffffff;
+  border-color: #6366f1;
+}
+
+.canvas-toolbar button.btn-primary:hover {
+  background: #4f46e5;
+  box-shadow: 0 0 10px rgba(99, 102, 241, 0.4);
+}

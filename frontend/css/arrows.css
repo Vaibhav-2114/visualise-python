@@ -1,0 +1,84 @@
+/* SVG Dynamic Arrows & Pointer Styling */
+
+/* SVG Layer */
+#connections-layer {
+  width: 100%;
+  height: 100%;
+  position: absolute;
+  top: 0;
+  left: 0;
+  overflow: visible;
+  pointer-events: none;
+}
+
+/* Pointer Group */
+.pointer-group {
+  pointer-events: auto;
+  cursor: pointer;
+}
+
+/* Invisible wide hitarea for easy hover/clicking */
+.pointer-hitarea {
+  stroke: transparent;
+  stroke-width: 14px;
+  cursor: pointer;
+  pointer-events: stroke;
+  fill: none;
+}
+
+/* Visible Crisp Vector Path */
+.pointer-line {
+  stroke: #6366f1;
+  stroke-width: 2.5px;
+  marker-end: url(#arrowhead);
+  fill: none;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  transition: stroke 0.2s ease, stroke-width 0.15s ease, filter 0.15s ease;
+}
+
+/* Hover Enhancement */
+.pointer-group:hover .pointer-line {
+  stroke-width: 3.5px;
+  stroke: #818cf8;
+  filter: drop-shadow(0 0 4px rgba(99, 102, 241, 0.7));
+}
+
+/* Highlighted Pointer (recently changed / updated) */
+.pointer-line.highlight {
+  stroke: #f59e0b;
+  stroke-width: 3px;
+  marker-end: url(#arrowhead-highlight);
+  filter: drop-shadow(0 0 6px rgba(245, 158, 11, 0.6));
+}
+
+.pointer-group:hover .pointer-line.highlight {
+  stroke: #fbbf24;
+  stroke-width: 4px;
+}
+
+/* Return / Loop Pointer */
+.pointer-line.return {
+  stroke: #10b981;
+  stroke-width: 2.5px;
+  marker-end: url(#arrowhead-return);
+}
+
+.pointer-group:hover .pointer-line.return {
+  stroke: #34d399;
+  stroke-width: 3.5px;
+  filter: drop-shadow(0 0 4px rgba(16, 185, 129, 0.7));
+}
+
+/* Arrowhead Marker Colors defined in SVG defs */
+marker#arrowhead path {
+  fill: #6366f1;
+}
+
+marker#arrowhead-highlight path {
+  fill: #f59e0b;
+}
+
+marker#arrowhead-return path {
+  fill: #10b981;
+}

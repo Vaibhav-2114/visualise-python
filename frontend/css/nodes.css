@@ -1,0 +1,303 @@
+/* Canvas Nodes, Cards, Stack Frames & Heap Object Styling */
+
+.canvas-node {
+  position: absolute;
+  cursor: grab;
+  user-select: none;
+  -webkit-user-select: none;
+  border-radius: 8px;
+  background: #1e293b;
+  border: 1px solid #334155;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.3), 0 2px 4px -2px rgba(0, 0, 0, 0.2);
+  z-index: 10;
+  min-width: 160px;
+  max-width: 320px;
+  box-sizing: border-box;
+}
+
+/* Transform transition applies ONLY during tidy layout resets, never during user drag */
+.canvas-node.is-animating {
+  transition: transform 0.4s cubic-bezier(0.2, 0, 0, 1), opacity 0.3s ease;
+}
+
+.canvas-node.is-dragging {
+  cursor: grabbing !important;
+  z-index: 1000 !important;
+  border-color: #6366f1 !important;
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.5), 0 8px 10px -6px rgba(0, 0, 0, 0.4), 0 0 15px rgba(99, 102, 241, 0.3) !important;
+}
+
+/* Header anatomy */
+.node-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  background: #243248;
+  border-top-left-radius: 7px;
+  border-top-right-radius: 7px;
+  border-bottom: 1px solid #334155;
+}
+
+.node-badge {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+
+.frame-badge {
+  background: #3730a3;
+  color: #c7d2fe;
+  border: 1px solid #4f46e5;
+}
+
+.class-badge {
+  background: #065f46;
+  color: #a7f3d0;
+  border: 1px solid #059669;
+}
+
+.list-badge {
+  background: #1e3a5f;
+  color: #93c5fd;
+  border: 1px solid #2563eb;
+}
+
+.dict-badge {
+  background: #701a75;
+  color: #f5d0fe;
+  border: 1px solid #a21caf;
+}
+
+.node-title {
+  font-size: 12px;
+  font-weight: 600;
+  color: #f8fafc;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  flex: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.node-line-tag {
+  font-size: 11px;
+  color: #94a3b8;
+  font-family: ui-monospace, monospace;
+}
+
+.node-id-tag {
+  font-size: 11px;
+  color: #94a3b8;
+  font-family: ui-monospace, monospace;
+}
+
+/* Body and Variable tables */
+.node-body {
+  padding: 8px 12px;
+}
+
+.var-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+}
+
+.var-row {
+  border-bottom: 1px solid rgba(51, 65, 85, 0.4);
+  transition: background-color 0.15s ease;
+}
+
+.var-row:last-child {
+  border-bottom: none;
+}
+
+.var-row:hover {
+  background: rgba(51, 65, 85, 0.3);
+}
+
+.var-name {
+  color: #38bdf8;
+  font-weight: 600;
+  padding: 4px 6px 4px 0;
+  text-align: left;
+}
+
+.var-type {
+  color: #64748b;
+  font-size: 11px;
+  padding: 4px 6px;
+  text-align: left;
+}
+
+.var-value-cell {
+  color: #f1f5f9;
+  padding: 4px 0 4px 6px;
+  text-align: right;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+}
+
+.primitive-val {
+  color: #34d399;
+}
+
+.primitive-val.val-str {
+  color: #fbbf24;
+}
+
+.primitive-val.val-bool {
+  color: #f472b6;
+}
+
+.primitive-val.val-none {
+  color: #94a3b8;
+  font-style: italic;
+}
+
+/* Heap Objects */
+.heap-object {
+  border-color: #334155;
+}
+
+.heap-object.class-listnode {
+  border-color: #4f46e5;
+}
+
+.heap-object.class-listnode .node-header {
+  background: #1e1b4b;
+  border-bottom-color: #4338ca;
+}
+
+.heap-object.class-list {
+  border-color: #2563eb;
+}
+
+.heap-object.class-dict {
+  border-color: #9333ea;
+}
+
+.heap-object.class-instance {
+  border-color: #059669;
+}
+
+/* Field Rows for Objects */
+.field-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 4px 0;
+  border-bottom: 1px solid rgba(51, 65, 85, 0.3);
+  font-size: 12px;
+  font-family: ui-monospace, monospace;
+}
+
+.field-row:last-child {
+  border-bottom: none;
+}
+
+.field-name {
+  color: #93c5fd;
+  font-weight: 500;
+}
+
+.field-value {
+  color: #f1f5f9;
+}
+
+/* List container cells */
+.list-cells-container {
+  display: flex;
+  gap: 4px;
+  padding: 8px 4px;
+  overflow-x: auto;
+}
+
+.list-cell {
+  background: #0f172a;
+  border: 1px solid #334155;
+  border-radius: 4px;
+  min-width: 38px;
+  text-align: center;
+  padding: 4px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.cell-index {
+  font-size: 10px;
+  color: #64748b;
+  border-bottom: 1px solid #1e293b;
+  width: 100%;
+  margin-bottom: 2px;
+}
+
+.cell-val {
+  font-size: 12px;
+  color: #f8fafc;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 18px;
+}
+
+/* Port Sockets for pointer arrows */
+.port-socket {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  border: 2px solid #6366f1;
+  background: #0f172a;
+  cursor: pointer;
+  transition: transform 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
+  vertical-align: middle;
+  box-sizing: border-box;
+}
+
+.port-socket::after {
+  content: '';
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: #6366f1;
+}
+
+.port-socket:hover {
+  transform: scale(1.3);
+  border-color: #818cf8;
+  box-shadow: 0 0 8px rgba(99, 102, 241, 0.8);
+}
+
+.port-socket:hover::after {
+  background: #a5b4fc;
+}
+
+/* Pulse animation on variable / attribute update */
+@keyframes pulseHighlight {
+  0% {
+    background-color: rgba(245, 158, 11, 0.45);
+    box-shadow: 0 0 12px rgba(245, 158, 11, 0.5);
+  }
+  50% {
+    background-color: rgba(245, 158, 11, 0.25);
+  }
+  100% {
+    background-color: transparent;
+    box-shadow: none;
+  }
+}
+
+.pulse-change {
+  animation: pulseHighlight 0.7s ease-out;
+  border-radius: 4px;
+}
