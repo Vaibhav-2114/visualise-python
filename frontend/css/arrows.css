@@ -11,9 +11,9 @@
   pointer-events: none;
 }
 
-/* Pointer Group */
+/* Pointer Group: non-blocking so cards beneath remain draggable */
 .pointer-group {
-  pointer-events: auto;
+  pointer-events: none;
   cursor: pointer;
 }
 
@@ -34,6 +34,7 @@
   fill: none;
   stroke-linecap: round;
   stroke-linejoin: round;
+  pointer-events: none;
   transition: stroke 0.2s ease, stroke-width 0.15s ease, filter 0.15s ease;
 }
 

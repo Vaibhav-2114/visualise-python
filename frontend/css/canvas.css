@@ -24,6 +24,7 @@
   will-change: transform;
 }
 
+/* Rendered above nodes so pointer lines visibly originate right from the blue port dots */
 #connections-layer {
   position: absolute;
   top: 0;
@@ -32,7 +33,7 @@
   height: 100%;
   overflow: visible;
   pointer-events: none;
-  z-index: 1;
+  z-index: 20;
 }
 
 #nodes-layer {
@@ -43,6 +44,11 @@
   height: 100%;
   pointer-events: auto;
   z-index: 2;
+}
+
+/* Never allow arrow hitareas to intercept pointer events while actively dragging a node */
+#canvas-viewport.is-dragging-active #connections-layer * {
+  pointer-events: none !important;
 }
 
 /* Floating Zoom & Pan Toolbar */

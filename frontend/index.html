@@ -162,12 +162,12 @@
 
     /* Line Numbers */
     #line-numbers {
-      width: 44px;
-      padding: 12px 6px 12px 0;
+      width: 56px;
+      padding: 12px 0 40px 0;
       text-align: right;
       font-family: var(--font-mono);
       font-size: 13px;
-      line-height: 1.6;
+      line-height: 21px;
       color: var(--text-muted);
       background: var(--bg-editor);
       border-right: 1px solid var(--border);
@@ -177,37 +177,150 @@
     }
 
     .line-number {
-      height: 20.8px; /* matches line-height */
+      height: 21px;
       display: flex;
       align-items: center;
-      justify-content: flex-end;
-      padding-right: 8px;
+      justify-content: space-between;
+      padding: 0 8px 0 6px;
+      border-right: 2px solid transparent;
     }
 
-    .line-number.active-line {
-      background: rgba(99, 102, 241, 0.2);
-      color: var(--accent-light);
+    .line-marker {
+      font-size: 11px;
+      min-width: 14px;
+      text-align: left;
+      line-height: 1;
+    }
+
+    .line-number.executed-line {
+      background: rgba(16, 185, 129, 0.16);
+      color: #6ee7b7;
       font-weight: 700;
-      border-right: 2px solid var(--accent);
+      border-right-color: var(--success);
+    }
+
+    .line-number.next-line {
+      background: rgba(245, 158, 11, 0.16);
+      color: #fcd34d;
+      font-weight: 700;
+      border-right-color: var(--warning);
+    }
+
+    .line-number.both-line {
+      background: linear-gradient(90deg, rgba(16, 185, 129, 0.22), rgba(245, 158, 11, 0.22));
+      color: #fde68a;
+      font-weight: 700;
+      border-right-color: var(--warning);
+    }
+
+    .line-number.error-line {
+      background: rgba(239, 68, 68, 0.24);
+      color: #fca5a5;
+      font-weight: 700;
+      border-right-color: var(--error);
+    }
+
+    /* Code Editor Container */
+    #editor-container {
+      flex: 1;
+      position: relative;
+      overflow: hidden;
+      background: var(--bg-editor);
+    }
+
+    /* Code Highlight Overlay (behind textarea, synced via scrollTop/scrollLeft) */
+    #code-highlights {
+      position: absolute;
+      inset: 0;
+      padding: 12px 12px 40px 12px;
+      font-family: var(--font-mono);
+      font-size: 13px;
+      line-height: 21px;
+      tab-size: 4;
+      pointer-events: none;
+      overflow: hidden;
+      white-space: pre;
+      z-index: 0;
+    }
+
+    .highlight-line {
+      display: block;
+      height: 21px;
+      min-width: 100%;
+      width: max-content;
+      border-left: 3px solid transparent;
+      margin-left: -3px;
+      padding-left: 0;
+      border-radius: 2px;
+    }
+
+    .highlight-line.executed-exec {
+      background: rgba(16, 185, 129, 0.14);
+      border-left-color: var(--success);
+    }
+
+    .highlight-line.next-exec {
+      background: rgba(245, 158, 11, 0.15);
+      border-left-color: var(--warning);
+    }
+
+    .highlight-line.both-exec {
+      background: linear-gradient(90deg, rgba(16, 185, 129, 0.18), rgba(245, 158, 11, 0.18));
+      border-left-color: var(--warning);
+    }
+
+    .highlight-line.error-exec {
+      background: rgba(239, 68, 68, 0.14);
+      border-left-color: var(--error);
+    }
+
+    .hl-indent {
+      color: transparent;
+    }
+
+    .error-squiggle {
+      color: transparent;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='8' height='4' viewBox='0 0 8 4'%3E%3Cpath d='M0 3 Q2 0 4 3 T8 3' stroke='%23ef4444' fill='none' stroke-width='1.5' stroke-linecap='round'/%3E%3C/svg%3E");
+      background-repeat: repeat-x;
+      background-position: left bottom;
+      background-size: 8px 4px;
+      padding-bottom: 2px;
     }
 
     /* Code Textarea */
     #code-editor {
-      flex: 1;
+      position: relative;
+      z-index: 1;
       width: 100%;
+      height: 100%;
       padding: 12px;
       font-family: var(--font-mono);
       font-size: 13px;
-      line-height: 1.6;
+      line-height: 21px;
       color: var(--text-primary);
-      background: var(--bg-editor);
+      background: transparent;
       border: none;
       outline: none;
       resize: none;
       overflow: auto;
       tab-size: 4;
       white-space: pre;
+      overflow-wrap: normal;
+      word-wrap: normal;
     }
+
+    .editor-legend {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 11px;
+      font-family: var(--font-mono);
+    }
+
+    .legend-item { display: inline-flex; align-items: center; gap: 4px; }
+    .legend-exec { color: #6ee7b7; }
+    .legend-next { color: #fcd34d; }
+    .legend-err  { color: #fca5a5; }
 
     #code-editor::placeholder {
       color: var(--text-muted);
@@ -605,11 +718,19 @@
         <div id="editor-area">
           <div class="editor-header">
             <span class="editor-header-title">📝 Code Editor</span>
+            <div class="editor-legend">
+              <span class="legend-item legend-exec">✓ Executed</span>
+              <span class="legend-item legend-next">→ Next</span>
+              <span class="legend-item legend-err">✕ Error</span>
+            </div>
             <span class="editor-lang-badge">Python 3</span>
           </div>
           <div id="editor-wrapper">
             <div id="line-numbers"></div>
-            <textarea id="code-editor" spellcheck="false" placeholder="# Write your Python code here...&#10;# Press Ctrl+Enter to run&#10;&#10;"></textarea>
+            <div id="editor-container">
+              <div id="code-highlights"></div>
+              <textarea id="code-editor" spellcheck="false" placeholder="# Write your Python code here...&#10;# Press Ctrl+Enter to run&#10;&#10;"></textarea>
+            </div>
           </div>
           <div id="error-banner"></div>
         </div>
@@ -761,6 +882,7 @@
     let traceData = null;
     let currentStep = 0;
     let totalSteps = 0;
+    let activeErrorLine = null;
     let autoplayInterval = null;
     let isAutoPlaying = false;
 
@@ -960,39 +1082,144 @@ print(f"Even squares: {evens}")
 print(f"Sum of even squares: {total}")`
     };
 
-    // ===== Load Default Example =====
-    codeEditor.value = EXAMPLES['linked-list-swap'];
-    updateLineNumbers();
+    // ===== Line Numbers & Highlights =====
+    const codeHighlights = document.getElementById('code-highlights');
+    const LINE_HEIGHT = 21;
 
-    // ===== Line Numbers =====
+    function escapeHtml(str) {
+      return str
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;');
+    }
+
+    function syncEditorScroll() {
+      lineNumbers.scrollTop = codeEditor.scrollTop;
+      codeHighlights.scrollTop = codeEditor.scrollTop;
+      codeHighlights.scrollLeft = codeEditor.scrollLeft;
+    }
+
     function updateLineNumbers() {
       const lines = codeEditor.value.split('\n');
       let html = '';
       for (let i = 0; i < lines.length; i++) {
-        html += `<div class="line-number" data-line="${i + 1}">${i + 1}</div>`;
+        html += `<div class="line-number" data-line="${i + 1}"><span class="line-marker"></span><span>${i + 1}</span></div>`;
       }
       lineNumbers.innerHTML = html;
+      activeErrorLine = null;
+      clearCodeHighlights();
+      showError(null);
+      syncEditorScroll();
     }
 
-    function highlightLine(lineNo) {
-      // Clear all highlights
+    function clearCodeHighlights() {
+      codeHighlights.innerHTML = '';
       lineNumbers.querySelectorAll('.line-number').forEach(el => {
-        el.classList.remove('active-line');
+        el.classList.remove('executed-line', 'next-line', 'both-line', 'error-line');
+        const marker = el.querySelector('.line-marker');
+        if (marker) marker.textContent = '';
       });
-      
-      if (lineNo) {
-        const lineEl = lineNumbers.querySelector(`[data-line="${lineNo}"]`);
-        if (lineEl) {
-          lineEl.classList.add('active-line');
-          // Scroll line into view
-          lineEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }
+
+    function renderCodeHighlights(executedLine, nextLine, errorLine) {
+      const lines = codeEditor.value.split('\n');
+      const totalLines = lines.length;
+      const clampedError = errorLine ? Math.max(1, Math.min(errorLine, totalLines)) : null;
+
+      lineNumbers.querySelectorAll('.line-number').forEach(el => {
+        const ln = parseInt(el.dataset.line, 10);
+        el.classList.remove('executed-line', 'next-line', 'both-line', 'error-line');
+        const marker = el.querySelector('.line-marker');
+        const isErr = clampedError === ln;
+        const isExec = executedLine === ln;
+        const isNext = nextLine === ln;
+
+        if (isErr) {
+          el.classList.add('error-line');
+          if (marker) marker.textContent = '✕';
+        } else if (isExec && isNext) {
+          el.classList.add('both-line');
+          if (marker) marker.textContent = '✓→';
+        } else if (isNext) {
+          el.classList.add('next-line');
+          if (marker) marker.textContent = '→';
+        } else if (isExec) {
+          el.classList.add('executed-line');
+          if (marker) marker.textContent = '✓';
+        } else if (marker) {
+          marker.textContent = '';
+        }
+      });
+
+      let html = '';
+      for (let i = 1; i <= totalLines; i++) {
+        const isErr = clampedError === i;
+        const isExec = executedLine === i;
+        const isNext = nextLine === i;
+        let cls = 'highlight-line';
+        if (isErr) cls += ' error-exec';
+        else if (isExec && isNext) cls += ' both-exec';
+        else if (isNext) cls += ' next-exec';
+        else if (isExec) cls += ' executed-exec';
+
+        if (isErr) {
+          const lineText = lines[i - 1] || '';
+          const match = lineText.match(/^(\s*)(.*)$/);
+          const indent = escapeHtml(match ? match[1] : '');
+          const codeText = match && match[2] ? escapeHtml(match[2]) : '   ';
+          html += `<div class="${cls}"><span class="hl-indent">${indent}</span><span class="error-squiggle">${codeText}</span></div>`;
+        } else {
+          html += `<div class="${cls}"></div>`;
         }
       }
+
+      codeHighlights.innerHTML = html;
+      syncEditorScroll();
     }
 
+    function highlightLines(executedLine, nextLine, errorLine = activeErrorLine) {
+      if (!executedLine && !nextLine && !errorLine) {
+        clearCodeHighlights();
+        return;
+      }
+      renderCodeHighlights(executedLine, nextLine, errorLine);
+      const focusLine = nextLine || executedLine || errorLine;
+      if (focusLine) scrollEditorToLine(focusLine);
+    }
+
+    function highlightErrorLine(lineNo) {
+      activeErrorLine = lineNo || null;
+      if (!activeErrorLine) return;
+      renderCodeHighlights(null, null, activeErrorLine);
+      scrollEditorToLine(activeErrorLine);
+    }
+
+    function scrollEditorToLine(lineNo) {
+      const totalLines = codeEditor.value.split('\n').length;
+      const clamped = Math.max(1, Math.min(lineNo, totalLines));
+      const lineTop = (clamped - 1) * LINE_HEIGHT;
+      const editorHeight = codeEditor.clientHeight;
+      const editorPadding = 12;
+      const visibleTop = codeEditor.scrollTop;
+      const visibleBottom = visibleTop + editorHeight - editorPadding * 2;
+
+      if (lineTop < visibleTop || lineTop > visibleBottom - LINE_HEIGHT) {
+        codeEditor.scrollTop = Math.max(0, lineTop - editorHeight / 3);
+      }
+      syncEditorScroll();
+    }
+
+    codeEditor.value = EXAMPLES['linked-list-swap'];
+    updateLineNumbers();
     codeEditor.addEventListener('input', updateLineNumbers);
-    codeEditor.addEventListener('scroll', () => {
-      lineNumbers.scrollTop = codeEditor.scrollTop;
+    codeEditor.addEventListener('scroll', syncEditorScroll);
+
+    errorBanner.style.cursor = 'pointer';
+    errorBanner.addEventListener('click', () => {
+      if (activeErrorLine) {
+        scrollEditorToLine(activeErrorLine);
+        codeEditor.focus();
+      }
     });
 
     // ===== Tab Key Support =====
@@ -1009,8 +1236,8 @@ print(f"Sum of even squares: {total}")`
 
     // ===== Run Code =====
     async function runCode() {
-      const code = codeEditor.value.trim();
-      if (!code) return;
+      const rawCode = codeEditor.value;
+      if (!rawCode.trim()) return;
 
       // Clear previous state
       resetVisualization();
@@ -1023,7 +1250,8 @@ print(f"Sum of even squares: {total}")`
         const response = await fetch('/api/trace', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ code, max_steps: 1000 })
+          // Send untrimmed rawCode so leading blank lines preserve exact line numbers
+          body: JSON.stringify({ code: rawCode, max_steps: 1000 })
         });
 
         const data = await response.json();
@@ -1032,6 +1260,7 @@ print(f"Sum of even squares: {total}")`
           traceData = data;
           totalSteps = data.total_steps || data.steps.length;
           currentStep = 0;
+          activeErrorLine = null;
 
           // Enable controls
           enableStepControls(true);
@@ -1047,9 +1276,22 @@ print(f"Sum of even squares: {total}")`
         } else if (data.status === 'error') {
           const err = data.error || {};
           const errMsg = `${err.type || 'Error'}: ${err.message || 'Unknown error'}${err.line ? ` (line ${err.line})` : ''}`;
+          activeErrorLine = err.line || null;
           showError(errMsg);
-          setStatus('error', 'Execution error');
-          if (err.line) highlightLine(err.line);
+          setStatus('error', err.line ? `${err.type || 'Error'} on line ${err.line}` : 'Execution error');
+
+          if (data.steps && data.steps.length > 0) {
+            traceData = data;
+            totalSteps = data.total_steps || data.steps.length;
+            currentStep = totalSteps - 1;
+            enableStepControls(true);
+            stepSlider.max = totalSteps - 1;
+            stepSlider.value = currentStep;
+            renderCurrentStep();
+            setTimeout(() => canvasManager.fitToView(), 100);
+          } else if (activeErrorLine) {
+            highlightErrorLine(activeErrorLine);
+          }
         } else {
           showError('No execution steps were generated. The code may be empty or trivial.');
           setStatus('error', 'No steps');
@@ -1068,12 +1310,25 @@ print(f"Sum of even squares: {total}")`
       if (!traceData || !traceData.steps || currentStep < 0 || currentStep >= totalSteps) return;
 
       const step = traceData.steps[currentStep];
-      
-      // Update canvas
       canvasManager.renderStep(step);
 
-      // Update line highlight
-      highlightLine(step.line);
+      let executedLineNo = null;
+      let nextLineNo = null;
+      if (step.event === 'return' || step.event === 'exception') {
+        executedLineNo = step.line;
+        if (currentStep + 1 < totalSteps) {
+          const upcoming = traceData.steps[currentStep + 1];
+          if (!(step.event === 'exception' && upcoming.event === 'return')) {
+            nextLineNo = upcoming.line;
+          }
+        }
+      } else {
+        executedLineNo = currentStep > 0 ? traceData.steps[currentStep - 1].line : null;
+        nextLineNo = step.line;
+      }
+
+      const stepErrorLine = step.event === 'exception' ? step.line : activeErrorLine;
+      highlightLines(executedLineNo, nextLineNo, stepErrorLine);
 
       // Update stdout
       stdoutContent.textContent = step.stdout || '(no output)';
@@ -1084,7 +1339,7 @@ print(f"Sum of even squares: {total}")`
 
       // Update status
       statusEvent.textContent = `Event: ${step.event || '—'} | Func: ${step.func_name || '—'}`;
-      statusLine.textContent = `Line: ${step.line || '—'}`;
+      statusLine.textContent = `Executed: ${executedLineNo ?? '—'} | Next: ${nextLineNo ?? '—'}`;
 
       // Update button states
       btnPrev.disabled = currentStep <= 0;
@@ -1156,15 +1411,9 @@ print(f"Sum of even squares: {total}")`
       traceData = null;
       currentStep = 0;
       totalSteps = 0;
-      
-      // Clear canvas
-      document.getElementById('nodes-layer').innerHTML = '';
-      const svg = document.getElementById('connections-layer');
-      svg.innerHTML = '';
-      canvasManager.positionStore.clear();
-      canvasManager.prevStepData = null;
-      canvasManager.prevValuesMap = new Map();
-      canvasManager.resetZoom();
+      activeErrorLine = null;
+
+      canvasManager.clear();
 
       // Reset controls
       enableStepControls(false);
@@ -1172,7 +1421,8 @@ print(f"Sum of even squares: {total}")`
       stepSlider.value = 0;
       stepInfo.textContent = 'Step 0 / 0';
       stdoutContent.textContent = 'No output yet.';
-      highlightLine(null);
+      showError(null);
+      clearCodeHighlights();
       statusEvent.textContent = '';
       statusLine.textContent = 'Line: —';
       setStatus('idle', 'Ready');
@@ -1277,8 +1527,7 @@ print(f"Sum of even squares: {total}")`
 
     // ===== Keyboard Shortcuts =====
     document.addEventListener('keydown', (e) => {
-      // Don't trigger shortcuts when typing in editor (unless Ctrl is held)
-      const inEditor = document.activeElement === codeEditor;
+      const inFormControl = ['TEXTAREA', 'INPUT', 'SELECT'].includes(document.activeElement?.tagName);
 
       if (e.key === 'Escape') {
         document.getElementById('shortcuts-modal').classList.remove('visible');
@@ -1305,7 +1554,7 @@ print(f"Sum of even squares: {total}")`
         return;
       }
 
-      if (inEditor) return;
+      if (inFormControl) return;
 
       if (e.key === 'ArrowRight' || e.key === 'd') {
         e.preventDefault();
@@ -1335,6 +1584,7 @@ print(f"Sum of even squares: {total}")`
       resizer.style.left = leftPanel.offsetWidth - 2 + 'px';
     }
     updateResizerPosition();
+    window.addEventListener('resize', updateResizerPosition);
 
     resizer.addEventListener('pointerdown', (e) => {
       isResizing = true;

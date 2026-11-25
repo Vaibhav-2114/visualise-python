@@ -160,6 +160,7 @@ export class DragManager {
     // Remove animation transition class during active dragging for immediate tracking
     nodeEl.classList.remove('is-animating');
     nodeEl.classList.add('is-dragging');
+    this.canvasManager?.viewport?.classList?.add('is-dragging-active');
 
     // Pointer capture locks mouse movement to this node even outside window
     if (typeof nodeEl.setPointerCapture === 'function') {
@@ -259,6 +260,8 @@ export class DragManager {
     }
     this.rafPending = false;
     this.pendingPointerCoords = null;
+
+    this.canvasManager?.viewport?.classList?.remove('is-dragging-active');
 
     if (this.state.nodeEl) {
       this.state.nodeEl.classList.remove('is-dragging');

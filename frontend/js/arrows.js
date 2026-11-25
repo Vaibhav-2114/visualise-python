@@ -10,11 +10,13 @@ export class ArrowRenderer {
    * @param {SVGElement} [options.svgContainer] The <svg id="connections-layer"> element
    * @param {HTMLElement} [options.nodesContainer] The <div id="nodes-layer"> element
    * @param {import('./position_store.js').PositionStore} [options.positionStore]
+   * @param {() => number} [options.getScale] Returns the current canvas scale factor
    */
   constructor(options = {}) {
     this.svgContainer = options.svgContainer || null;
     this.nodesContainer = options.nodesContainer || null;
     this.positionStore = options.positionStore || null;
+    this.getScale = options.getScale || (() => 1.0);
 
     /** @type {Array<any>} Active edges list */
     this.edges = [];
@@ -26,6 +28,32 @@ export class ArrowRenderer {
     this.nodeEdgeIndex = new Map();
 
     this.ensureMarkers();
+  }
+
+  /**
+   * Escapes a string for safe inclusion in a CSS attribute/ID selector.
+   * @param {string} value
+   * @returns {string}
+   */
+  escapeSelector(value) {
+    const str = String(value);
+    if (typeof CSS !== 'undefined' && typeof CSS.escape === 'function') {
+      return CSS.escape(str);
+    }
+    return str.replace(/[^a-zA-Z0-9_-]/g, (char) => String.fromCharCode(92) + char);
+  }
+
+  /**
+   * Clears all rendered edges, indexes, and SVG path groups while preserving markers.
+   */
+  clear() {
+    this.edges = [];
+    this.edgeElements.clear();
+    this.nodeEdgeIndex.clear();
+    if (this.svgContainer) {
+      this.svgContainer.innerHTML = '';
+      this.ensureMarkers();
+    }
   }
 
   /**
@@ -123,8 +151,8 @@ export class ArrowRenderer {
     // Remove obsolete edge DOM elements
     const activeEdgeIds = new Set(this.edges.map((e) => e.id));
     for (const [id, el] of this.edgeElements.entries()) {
-      if (!activeEdgeIds.has(id)) {
-        el.remove();
+      if (!activeEdgeIds.has(id) || el.isConnected === false) {
+        if (typeof el.remove === 'function') el.remove();
         this.edgeElements.delete(id);
       }
     }
@@ -157,7 +185,7 @@ export class ArrowRenderer {
       });
 
       let groupEl = this.edgeElements.get(edge.id);
-      if (!groupEl) {
+      if (!groupEl || groupEl.isConnected === false) {
         groupEl = document.createElementNS('http://www.w3.org/2000/svg', 'g');
         groupEl.setAttribute('class', 'pointer-group');
         groupEl.setAttribute('id', edge.id);
@@ -189,6 +217,13 @@ export class ArrowRenderer {
       hitarea.setAttribute('d', pathData);
       line.setAttribute('d', pathData);
     }
+  }
+
+  /**
+   * Redraws every active edge after a layout transition.
+   */
+  updateAllArrows() {
+    this.renderEdges(this.edges);
   }
 
   /**
@@ -285,9 +320,9 @@ export class ArrowRenderer {
     const targetRect = this.getNodeRect(edge.targetNodeId);
     const portRect = this.getPortRect(edge.sourcePortId, sourceRect);
 
-    // Source anchor (Sx, Sy): right center of the port socket
-    let Sx = portRect.x + portRect.width;
-    let Sy = portRect.y + (portRect.height * 0.5);
+    // Anchor directly at the exact center of the blue .port-socket dot
+    const Sx = portRect.x + (portRect.width * 0.5);
+    const Sy = portRect.y + (portRect.height * 0.5);
 
     // Self-loop (sourceNode === targetNode)
     if (edge.sourceNodeId === edge.targetNodeId) {
@@ -388,7 +423,8 @@ export class ArrowRenderer {
   getNodeRect(nodeId) {
     // If DOM element exists and layout is available
     if (this.nodesContainer && typeof document !== 'undefined') {
-      const el = this.nodesContainer.querySelector(`#${nodeId}`) || document.getElementById(nodeId);
+      const escapedId = this.escapeSelector(nodeId);
+      const el = this.nodesContainer.querySelector(`#${escapedId}`) || document.getElementById(nodeId);
       if (el) {
         // Try positionStore first for crisp coordinates
         const stored = this.positionStore?.get(nodeId);
@@ -417,27 +453,34 @@ export class ArrowRenderer {
 
   /**
    * Resolve bounding rect for a port socket.
+   * Uses getBoundingClientRect for precise positioning, then divides the
+   * screen-space offset by the canvas scale to convert to world coordinates.
    * @param {string} portId
    * @param {{ x: number, y: number, width: number, height: number }} nodeRect
    * @returns {{ x: number, y: number, width: number, height: number }}
    */
   getPortRect(portId, nodeRect) {
     if (this.nodesContainer && typeof document !== 'undefined') {
-      const el = this.nodesContainer.querySelector(`[data-port-id="${portId}"]`) ||
-                 document.querySelector(`[data-port-id="${portId}"]`);
+      const escapedPort = this.escapeSelector(portId);
+      const selector = `[data-port-id="${escapedPort}"]`;
+      const el = this.nodesContainer.querySelector(selector) || document.querySelector(selector);
       if (el) {
-        // Compute relative offset inside node
         const nodeEl = el.closest('.canvas-node');
         if (nodeEl) {
           const elRect = el.getBoundingClientRect();
           const nodeBounding = nodeEl.getBoundingClientRect();
-          const relX = elRect.left - nodeBounding.left;
-          const relY = elRect.top - nodeBounding.top;
+          // getBoundingClientRect returns screen-space coords (includes CSS scale transform).
+          // Divide by scale to convert to world-space offsets within the node.
+          const scale = (typeof this.getScale === 'function' ? this.getScale() : 1.0) || 1.0;
+          const relX = (elRect.left - nodeBounding.left) / scale;
+          const relY = (elRect.top - nodeBounding.top) / scale;
+          const w = (elRect.width) / scale;
+          const h = (elRect.height) / scale;
           return {
             x: nodeRect.x + relX,
             y: nodeRect.y + relY,
-            width: el.offsetWidth || 12,
-            height: el.offsetHeight || 12
+            width: w || 12,
+            height: h || 12
           };
         }
       }

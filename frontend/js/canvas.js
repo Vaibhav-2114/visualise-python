@@ -36,7 +36,8 @@ export class CanvasManager {
     this.arrowRenderer = options.arrowRenderer || new ArrowRenderer({
       svgContainer: this.connectionsLayer,
       nodesContainer: this.nodesLayer,
-      positionStore: this.positionStore
+      positionStore: this.positionStore,
+      getScale: () => this.scale
     });
     this.dragManager = options.dragManager || new DragManager({
       canvasManager: this,
@@ -92,6 +93,24 @@ export class CanvasManager {
       window.removeEventListener('pointerup', this.onViewportPointerUp);
       window.removeEventListener('pointercancel', this.onViewportPointerUp);
     }
+  }
+
+  /**
+   * Fully resets canvas DOM nodes, SVG edges, stored positions, and zoom/pan.
+   */
+  clear() {
+    if (this.nodesLayer) {
+      this.nodesLayer.innerHTML = '';
+    }
+    if (this.arrowRenderer) {
+      this.arrowRenderer.clear();
+    } else if (this.connectionsLayer) {
+      this.connectionsLayer.innerHTML = '';
+    }
+    this.positionStore.clear();
+    this.prevStepData = null;
+    this.prevValuesMap = new Map();
+    this.resetZoom();
   }
 
   /**
@@ -207,18 +226,31 @@ export class CanvasManager {
     let boxes = customBoxes;
     if (!boxes) {
       boxes = [];
-      const positions = this.positionStore.getAll();
-      for (const [id, pos] of Object.entries(positions)) {
-        let width = 180;
-        let height = 120;
-        if (this.nodesLayer) {
-          const el = this.nodesLayer.querySelector(`#${id}`);
-          if (el) {
-            width = el.offsetWidth || 180;
-            height = el.offsetHeight || 120;
+      const activeNodes = this.nodesLayer ? this.nodesLayer.querySelectorAll('.canvas-node') : [];
+      if (activeNodes.length > 0) {
+        activeNodes.forEach((el) => {
+          const pos = this.positionStore.get(el.id) || { x: el.offsetLeft || 0, y: el.offsetTop || 0 };
+          boxes.push({
+            x: pos.x,
+            y: pos.y,
+            width: el.offsetWidth || 180,
+            height: el.offsetHeight || 120
+          });
+        });
+      } else {
+        const positions = this.positionStore.getAll();
+        for (const [id, pos] of Object.entries(positions)) {
+          let width = 180;
+          let height = 120;
+          if (this.nodesLayer) {
+            const el = this.nodesLayer.querySelector(`#${id}`);
+            if (el) {
+              width = el.offsetWidth || 180;
+              height = el.offsetHeight || 120;
+            }
           }
+          boxes.push({ x: pos.x, y: pos.y, width, height });
         }
-        boxes.push({ x: pos.x, y: pos.y, width, height });
       }
     }
 
@@ -292,14 +324,14 @@ export class CanvasManager {
       }
     }
 
-    // Update arrows
+    // Refresh arrows after the CSS transition settles
     setTimeout(() => {
-      this.renderEdgesFromStep(this.prevStepData);
       if (this.nodesLayer) {
         const nodes = this.nodesLayer.querySelectorAll('.canvas-node');
         nodes.forEach((n) => n.classList.remove('is-animating'));
       }
-    }, 400);
+      this.arrowRenderer?.updateAllArrows();
+    }, 420);
   }
 
   /**
@@ -363,6 +395,51 @@ export class CanvasManager {
   }
 
   /**
+   * Formats a non-reference value descriptor into display text, type label, and CSS class.
+   * Handles primitive (int, float, bool, str, none), class, function, and other descriptors.
+   * @param {any} valDesc
+   * @returns {{ typeStr: string, displayText: string, valClass: string }}
+   */
+  formatValueDisplay(valDesc) {
+    if (valDesc && typeof valDesc === 'object') {
+      if (valDesc.kind === 'class') {
+        return { typeStr: 'class', displayText: `<class ${valDesc.name || 'object'}>`, valClass: 'val-class' };
+      }
+      if (valDesc.kind === 'function') {
+        return { typeStr: 'func', displayText: `${valDesc.name || 'fn'}()`, valClass: 'val-func' };
+      }
+      if (valDesc.kind === 'other') {
+        return { typeStr: 'obj', displayText: String(valDesc.repr ?? ''), valClass: '' };
+      }
+      if (valDesc.kind === 'primitive' || 'value' in valDesc) {
+        const raw = valDesc.value;
+        const t = valDesc.type || typeof raw;
+        if (t === 'none' || raw === null || raw === undefined) {
+          return { typeStr: 'NoneType', displayText: 'None', valClass: 'val-none' };
+        }
+        if (t === 'bool' || typeof raw === 'boolean') {
+          return { typeStr: 'bool', displayText: raw ? 'True' : 'False', valClass: 'val-bool' };
+        }
+        if (t === 'str' || typeof raw === 'string') {
+          return { typeStr: 'str', displayText: JSON.stringify(String(raw)), valClass: 'val-str' };
+        }
+        return { typeStr: String(t), displayText: String(raw), valClass: '' };
+      }
+    }
+
+    if (valDesc === null || valDesc === undefined || valDesc === 'None') {
+      return { typeStr: 'NoneType', displayText: 'None', valClass: 'val-none' };
+    }
+    if (typeof valDesc === 'boolean') {
+      return { typeStr: 'bool', displayText: valDesc ? 'True' : 'False', valClass: 'val-bool' };
+    }
+    if (typeof valDesc === 'string') {
+      return { typeStr: 'str', displayText: valDesc, valClass: this.getPrimitiveValClass(valDesc) };
+    }
+    return { typeStr: typeof valDesc, displayText: String(valDesc), valClass: '' };
+  }
+
+  /**
    * Renders and diffs an execution step data snapshot on the canvas.
    * @param {{ step?: number, line?: number, func_name?: string, stack?: Array<any>, heap?: Record<string, any> }} stepData
    */
@@ -378,6 +455,7 @@ export class CanvasManager {
 
     const activeNodeIds = new Set();
     const currentValuesMap = new Map();
+    const changedKeys = new Set();
 
     // 1. Render / Update Stack Frames
     stack.forEach((frame, idx) => {
@@ -385,7 +463,7 @@ export class CanvasManager {
       const rawId = (frame.frame_id !== undefined && frame.frame_id !== null && frame.frame_id !== '') ? frame.frame_id : idx;
       const frameId = normalizeNodeId(rawId, 'frame');
       activeNodeIds.add(frameId);
-      this.renderStackFrameNode(frameId, frame, currentValuesMap);
+      this.renderStackFrameNode(frameId, frame, currentValuesMap, changedKeys);
     });
 
     // 2. Render / Update Heap Objects
@@ -393,7 +471,7 @@ export class CanvasManager {
       if (!obj) continue;
       const objId = normalizeNodeId(rawId, 'obj');
       activeNodeIds.add(objId);
-      this.renderHeapObjectNode(objId, obj, currentValuesMap);
+      this.renderHeapObjectNode(objId, obj, currentValuesMap, changedKeys);
     }
 
     // 3. Diff and remove dead nodes
@@ -410,7 +488,7 @@ export class CanvasManager {
     this.prevValuesMap = currentValuesMap;
 
     // 5. Render Reference Connection Edges
-    this.renderEdgesFromStep(stepData);
+    this.renderEdgesFromStep(stepData, changedKeys);
   }
 
   /**
@@ -418,22 +496,24 @@ export class CanvasManager {
    * @param {string} frameId
    * @param {Object} frame
    * @param {Map<string, string>} currentValuesMap
+   * @param {Set<string>} [changedKeys]
    */
-  renderStackFrameNode(frameId, frame, currentValuesMap) {
+  renderStackFrameNode(frameId, frame, currentValuesMap, changedKeys = new Set()) {
     if (!this.nodesLayer || typeof document === 'undefined') return;
 
     let nodeEl = this.nodesLayer.querySelector(`#${frameId}`);
     const pos = this.positionStore.get(frameId) || { x: 50, y: 50 };
+    const activeCls = frame.is_active ? ' active-frame' : '';
 
     if (!nodeEl) {
       nodeEl = document.createElement('div');
-      nodeEl.className = 'canvas-node stack-frame';
+      nodeEl.className = `canvas-node stack-frame${activeCls}`;
       nodeEl.id = frameId;
       nodeEl.style.transform = `translate3d(${pos.x}px, ${pos.y}px, 0)`;
       this.nodesLayer.appendChild(nodeEl);
       this.dragManager.bindDraggable(nodeEl, frameId);
     } else {
-      // Keep position stable
+      nodeEl.className = `canvas-node stack-frame${activeCls}`;
       nodeEl.style.transform = `translate3d(${pos.x}px, ${pos.y}px, 0)`;
     }
 
@@ -451,6 +531,7 @@ export class CanvasManager {
 
       const hasChanged = this.prevValuesMap.has(valueKey) &&
                          this.prevValuesMap.get(valueKey) !== serializedVal;
+      if (hasChanged) changedKeys.add(valueKey);
       const pulseClass = hasChanged ? ' pulse-change' : '';
 
       if (varVal && (varVal.kind === 'ref' || varVal.type === 'ref')) {
@@ -467,14 +548,39 @@ export class CanvasManager {
           </tr>
         `;
       } else {
-        const typeStr = varVal?.type || typeof (varVal?.value !== undefined ? varVal.value : varVal);
-        const displayVal = varVal?.value !== undefined ? varVal.value : varVal;
-        const valClass = this.getPrimitiveValClass(displayVal);
+        const { typeStr, displayText, valClass } = this.formatValueDisplay(varVal);
         varsHtml += `
           <tr class="var-row${pulseClass}" data-var="${this.escapeHtml(varName)}">
             <td class="var-name">${this.escapeHtml(varName)}</td>
-            <td class="var-type">${this.escapeHtml(String(typeStr))}</td>
-            <td class="var-value-cell"><span class="primitive-val ${valClass}">${this.escapeHtml(String(displayVal))}</span></td>
+            <td class="var-type">${this.escapeHtml(typeStr)}</td>
+            <td class="var-value-cell"><span class="primitive-val ${valClass}">${this.escapeHtml(displayText)}</span></td>
+          </tr>
+        `;
+      }
+    }
+
+    if (frame.return_value !== null && frame.return_value !== undefined) {
+      const retVal = frame.return_value;
+      if (retVal && (retVal.kind === 'ref' || retVal.type === 'ref')) {
+        const rawTarget = retVal.target || retVal.value;
+        const targetId = (rawTarget !== null && rawTarget !== undefined) ? String(rawTarget) : '';
+        const portId = `${frameId}:__return__`;
+        varsHtml += `
+          <tr class="var-row return-row" data-var="__return__">
+            <td class="var-name">return</td>
+            <td class="var-type">ref</td>
+            <td class="var-value-cell">
+              <span class="port-socket return-port" data-port-id="${this.escapeHtml(portId)}" title="Returns #${this.escapeHtml(targetId)}"></span>
+            </td>
+          </tr>
+        `;
+      } else {
+        const { typeStr, displayText, valClass } = this.formatValueDisplay(retVal);
+        varsHtml += `
+          <tr class="var-row return-row" data-var="__return__">
+            <td class="var-name">return</td>
+            <td class="var-type">${this.escapeHtml(typeStr)}</td>
+            <td class="var-value-cell"><span class="primitive-val ${valClass}">${this.escapeHtml(displayText)}</span></td>
           </tr>
         `;
       }
@@ -499,8 +605,9 @@ export class CanvasManager {
    * @param {string} objId
    * @param {Object} obj
    * @param {Map<string, string>} currentValuesMap
+   * @param {Set<string>} [changedKeys]
    */
-  renderHeapObjectNode(objId, obj, currentValuesMap) {
+  renderHeapObjectNode(objId, obj, currentValuesMap, changedKeys = new Set()) {
     if (!this.nodesLayer || typeof document === 'undefined') return;
 
     let nodeEl = this.nodesLayer.querySelector(`#${objId}`);
@@ -555,6 +662,7 @@ export class CanvasManager {
         const serialized = JSON.stringify(item);
         currentValuesMap.set(itemKey, serialized);
         const hasChanged = this.prevValuesMap.has(itemKey) && this.prevValuesMap.get(itemKey) !== serialized;
+        if (hasChanged) changedKeys.add(itemKey);
         const pulseClass = hasChanged ? ' pulse-change' : '';
 
         if (item && (item.kind === 'ref' || item.type === 'ref')) {
@@ -568,12 +676,11 @@ export class CanvasManager {
             </div>
           `;
         } else {
-          const displayVal = item?.value !== undefined ? item.value : item;
-          const valClass = this.getPrimitiveValClass(displayVal);
+          const { displayText, valClass } = this.formatValueDisplay(item);
           cellsHtml += `
             <div class="list-cell${pulseClass}">
               <div class="cell-index">${idx}</div>
-              <div class="cell-val primitive-val ${valClass}">${this.escapeHtml(String(displayVal))}</div>
+              <div class="cell-val primitive-val ${valClass}">${this.escapeHtml(displayText)}</div>
             </div>
           `;
         }
@@ -590,6 +697,7 @@ export class CanvasManager {
         const serialized = JSON.stringify(val);
         currentValuesMap.set(entryKey, serialized);
         const hasChanged = this.prevValuesMap.has(entryKey) && this.prevValuesMap.get(entryKey) !== serialized;
+        if (hasChanged) changedKeys.add(entryKey);
         const pulseClass = hasChanged ? ' pulse-change' : '';
 
         if (val && (val.kind === 'ref' || val.type === 'ref')) {
@@ -603,12 +711,11 @@ export class CanvasManager {
             </div>
           `;
         } else {
-          const displayVal = val?.value !== undefined ? val.value : val;
-          const valClass = this.getPrimitiveValClass(displayVal);
+          const { displayText, valClass } = this.formatValueDisplay(val);
           rowsHtml += `
             <div class="field-row${pulseClass}" data-field="${this.escapeHtml(keyStr)}">
               <span class="field-name">${this.escapeHtml(keyStr)}:</span>
-              <span class="field-value primitive-val ${valClass}">${this.escapeHtml(String(displayVal))}</span>
+              <span class="field-value primitive-val ${valClass}">${this.escapeHtml(displayText)}</span>
             </div>
           `;
         }
@@ -623,6 +730,7 @@ export class CanvasManager {
         const serialized = JSON.stringify(attrVal);
         currentValuesMap.set(attrKey, serialized);
         const hasChanged = this.prevValuesMap.has(attrKey) && this.prevValuesMap.get(attrKey) !== serialized;
+        if (hasChanged) changedKeys.add(attrKey);
         const pulseClass = hasChanged ? ' pulse-change' : '';
 
         if (attrVal && (attrVal.kind === 'ref' || attrVal.type === 'ref')) {
@@ -636,12 +744,11 @@ export class CanvasManager {
             </div>
           `;
         } else {
-          const displayVal = attrVal?.value !== undefined ? attrVal.value : attrVal;
-          const valClass = this.getPrimitiveValClass(displayVal);
+          const { displayText, valClass } = this.formatValueDisplay(attrVal);
           rowsHtml += `
             <div class="field-row${pulseClass}" data-field="${this.escapeHtml(attrName)}">
               <span class="field-name">${this.escapeHtml(attrName)}:</span>
-              <span class="field-value primitive-val ${valClass}">${this.escapeHtml(String(displayVal))}</span>
+              <span class="field-value primitive-val ${valClass}">${this.escapeHtml(displayText)}</span>
             </div>
           `;
         }
@@ -665,8 +772,9 @@ export class CanvasManager {
   /**
    * Extracts reference edges from stepData and triggers ArrowRenderer.
    * @param {Object} stepData
+   * @param {Set<string>} [changedKeys]
    */
-  renderEdgesFromStep(stepData) {
+  renderEdgesFromStep(stepData, changedKeys = new Set()) {
     if (!stepData || !this.arrowRenderer) return;
 
     const edges = [];
@@ -690,7 +798,22 @@ export class CanvasManager {
             sourcePortId,
             sourceNodeId: frameId,
             targetNodeId,
-            isHighlighted: false
+            isHighlighted: changedKeys.has(sourcePortId)
+          });
+        }
+      }
+      if (frame.return_value && (frame.return_value.kind === 'ref' || frame.return_value.type === 'ref')) {
+        const rawTarget = frame.return_value.target || frame.return_value.value;
+        if (rawTarget && rawTarget !== 'None' && rawTarget !== 'null' && rawTarget !== 'undefined') {
+          const targetNodeId = normalizeNodeId(rawTarget, 'obj');
+          const sourcePortId = `${frameId}:__return__`;
+          edges.push({
+            id: `edge-${sourcePortId}->${targetNodeId}`,
+            sourcePortId,
+            sourceNodeId: frameId,
+            targetNodeId,
+            isHighlighted: false,
+            isReturn: true
           });
         }
       }
@@ -713,7 +836,7 @@ export class CanvasManager {
               sourcePortId,
               sourceNodeId: objId,
               targetNodeId,
-              isHighlighted: false
+              isHighlighted: changedKeys.has(sourcePortId)
             });
           }
         });
@@ -732,7 +855,7 @@ export class CanvasManager {
               sourcePortId,
               sourceNodeId: objId,
               targetNodeId,
-              isHighlighted: false
+              isHighlighted: changedKeys.has(sourcePortId)
             });
           }
         });
@@ -749,7 +872,7 @@ export class CanvasManager {
               sourcePortId,
               sourceNodeId: objId,
               targetNodeId,
-              isHighlighted: false
+              isHighlighted: changedKeys.has(sourcePortId)
             });
           }
         }

@@ -47,9 +47,10 @@ def trace_code(
         return {
             "status": "error",
             "error": {
-                "type": "SyntaxError",
+                "type": type(e).__name__,
                 "message": e.msg if hasattr(e, "msg") else str(e),
                 "line": e.lineno,
+                "offset": getattr(e, "offset", None),
                 "traceback": traceback.format_exc(),
             },
         }
@@ -71,9 +72,10 @@ def trace_code(
         return {
             "status": "error",
             "error": {
-                "type": "SyntaxError",
+                "type": type(e).__name__,
                 "message": e.msg if hasattr(e, "msg") else str(e),
                 "line": e.lineno,
+                "offset": getattr(e, "offset", None),
                 "traceback": traceback.format_exc(),
             },
         }
@@ -161,6 +163,9 @@ def trace_code(
         except StepLimitExceeded as e:
             return {
                 "status": "error",
+                "code": code,
+                "total_steps": len(steps),
+                "steps": steps,
                 "error": {
                     "type": "RuntimeError",
                     "message": str(e),
@@ -171,6 +176,9 @@ def trace_code(
         except TimeoutError as e:
             return {
                 "status": "error",
+                "code": code,
+                "total_steps": len(steps),
+                "steps": steps,
                 "error": {
                     "type": "TimeoutError",
                     "message": str(e),
@@ -181,6 +189,9 @@ def trace_code(
         except SecurityError as e:
             return {
                 "status": "error",
+                "code": code,
+                "total_steps": len(steps),
+                "steps": steps,
                 "error": {
                     "type": "SecurityError",
                     "message": e.message,
@@ -200,6 +211,9 @@ def trace_code(
 
             return {
                 "status": "error",
+                "code": code,
+                "total_steps": len(steps),
+                "steps": steps,
                 "error": {
                     "type": type(e).__name__,
                     "message": str(e),

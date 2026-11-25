@@ -19,7 +19,7 @@ from pathlib import Path
 from typing import Optional
 
 from .limits import MAX_STEPS, TIMEOUT_SECONDS
-from .tracer import execute_trace_sandboxed, trace_code
+from .tracer import execute_trace_sandboxed
 
 MIME_TYPES = {
     ".html": "text/html; charset=utf-8",
@@ -111,6 +111,8 @@ class VisualizerRequestHandler(http.server.BaseHTTPRequestHandler):
 
         try:
             length = int(content_length)
+            if length < 0 or length > 1_000_000:
+                raise ValueError("Invalid Content-Length")
             raw_body = self.rfile.read(length).decode("utf-8")
             payload = json.loads(raw_body)
         except Exception as e:
@@ -139,7 +141,7 @@ class VisualizerRequestHandler(http.server.BaseHTTPRequestHandler):
 
         code = payload["code"]
         max_steps = payload.get("max_steps", MAX_STEPS)
-        if not isinstance(max_steps, int) or max_steps <= 0:
+        if isinstance(max_steps, bool) or not isinstance(max_steps, int) or max_steps <= 0:
             max_steps = MAX_STEPS
         else:
             max_steps = min(max_steps, MAX_STEPS)

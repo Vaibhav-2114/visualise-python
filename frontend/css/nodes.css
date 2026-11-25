@@ -120,6 +120,15 @@
   background: rgba(51, 65, 85, 0.3);
 }
 
+.var-row.return-row {
+  border-top: 1px dashed rgba(16, 185, 129, 0.45);
+  background: rgba(16, 185, 129, 0.08);
+}
+
+.var-row.return-row .var-name {
+  color: #34d399;
+}
+
 .var-name {
   color: #38bdf8;
   font-weight: 600;
@@ -158,6 +167,14 @@
 .primitive-val.val-none {
   color: #94a3b8;
   font-style: italic;
+}
+
+.primitive-val.val-func {
+  color: #a5b4fc;
+}
+
+.primitive-val.val-class {
+  color: #6ee7b7;
 }
 
 /* Heap Objects */
