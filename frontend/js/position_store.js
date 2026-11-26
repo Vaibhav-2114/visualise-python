@@ -1,290 +1,318 @@
 /**
  * PositionStore manages canvas node coordinates and persistent manual drag overrides.
- * Includes intelligent auto-layout with linked-list chain detection and 2D grid placement.
+ * Includes dynamic-height stack alignment, topological heap layering, linked-list grouping,
+ * and bounding-box collision avoidance around user-moved nodes.
  */
 
-/**
- * Normalizes an ID to canonical form (e.g. obj_1 -> obj-1, frame_0 -> frame-0).
- * Strips redundant prefixes to avoid double prefixing like obj-obj_1.
- * @param {any} raw
- * @param {'obj' | 'frame'} prefix
- * @returns {string}
- */
 export function normalizeNodeId(raw, prefix) {
   if (raw === null || raw === undefined) return '';
   let s = String(raw).trim();
-  while (s.startsWith(`${prefix}-`) || s.startsWith(`${prefix}_`)) {
-    s = s.slice(prefix.length + 1);
-  }
+  while (s.startsWith(`${prefix}-`) || s.startsWith(`${prefix}_`)) s = s.slice(prefix.length + 1);
   return `${prefix}-${s}`;
 }
 
 export class PositionStore {
   constructor() {
-    /** @type {Map<string, { x: number, y: number, isUserMoved: boolean }>} */
     this.positions = new Map();
   }
 
-  /**
-   * Get position for a given node ID.
-   * @param {string} id
-   * @returns {{ x: number, y: number, isUserMoved: boolean } | undefined}
-   */
   get(id) {
-    if (this.positions.has(id)) {
-      return { ...this.positions.get(id) };
-    }
+    if (this.positions.has(id)) return { ...this.positions.get(id) };
     const objNorm = normalizeNodeId(id, 'obj');
-    if (this.positions.has(objNorm)) {
-      return { ...this.positions.get(objNorm) };
-    }
+    if (this.positions.has(objNorm)) return { ...this.positions.get(objNorm) };
     const frameNorm = normalizeNodeId(id, 'frame');
-    if (this.positions.has(frameNorm)) {
-      return { ...this.positions.get(frameNorm) };
-    }
+    if (this.positions.has(frameNorm)) return { ...this.positions.get(frameNorm) };
     return undefined;
   }
 
-  /**
-   * Set or update position for a given node ID.
-   * @param {string} id
-   * @param {number} x
-   * @param {number} y
-   * @param {boolean} [isUserMoved=false]
-   */
   set(id, x, y, isUserMoved = false) {
-    this.positions.set(id, {
-      x: Math.round(x),
-      y: Math.round(y),
-      isUserMoved: Boolean(isUserMoved)
-    });
+    this.positions.set(id, { x: Math.round(x), y: Math.round(y), isUserMoved: Boolean(isUserMoved) });
   }
 
-  /**
-   * Check if a position exists for a given node ID.
-   * @param {string} id
-   * @returns {boolean}
-   */
   has(id) {
-    if (this.positions.has(id)) return true;
-    const objNorm = normalizeNodeId(id, 'obj');
-    if (this.positions.has(objNorm)) return true;
-    const frameNorm = normalizeNodeId(id, 'frame');
-    return this.positions.has(frameNorm);
+    return this.positions.has(id) || this.positions.has(normalizeNodeId(id, 'obj')) ||
+      this.positions.has(normalizeNodeId(id, 'frame'));
   }
 
-  /**
-   * Remove position for a given node ID.
-   * @param {string} id
-   * @returns {boolean}
-   */
   remove(id) {
     return this.positions.delete(id);
   }
 
-  /**
-   * Clear all stored positions.
-   */
   clear() {
     this.positions.clear();
   }
 
-  /**
-   * Export all positions as an object.
-   * @returns {Record<string, { x: number, y: number, isUserMoved: boolean }>}
-   */
   getAll() {
     const result = {};
-    for (const [key, value] of this.positions.entries()) {
-      result[key] = { ...value };
-    }
+    for (const [key, value] of this.positions.entries()) result[key] = { ...value };
     return result;
   }
 
-  /**
-   * Detects linked list chains from heap objects.
-   * Chains are sequences where an object points to another object of the same type via 'next'.
-   * @param {Record<string, any>} heap
-   * @returns {Array<string[]>} Array of chains, each being an array of object IDs in sequence
-   */
+  isChainLikeObject(obj) {
+    if (!obj || typeof obj !== 'object') return false;
+    if (obj.class_name === 'ListNode') return true;
+    const attrs = obj.attrs || obj.fields || {};
+    return Object.prototype.hasOwnProperty.call(attrs, 'next');
+  }
+
+  extractHeapOutgoingRefs(obj, objIds, findHeapKey) {
+    const targets = [];
+    if (!obj || typeof obj !== 'object') return targets;
+    const collectRef = (val) => {
+      if (val && (val.kind === 'ref' || val.type === 'ref')) {
+        const rawTarget = val.target || val.value;
+        if (rawTarget) {
+          const resolved = findHeapKey(rawTarget);
+          if (resolved) targets.push(resolved);
+        }
+      }
+    };
+    if ((obj.type === 'list' || obj.type === 'tuple' || obj.type === 'set') && Array.isArray(obj.items)) {
+      obj.items.forEach(collectRef);
+    } else if (obj.type === 'dict' && Array.isArray(obj.entries)) {
+      obj.entries.forEach((entry) => collectRef(entry?.value));
+    } else {
+      Object.values(obj.attrs || obj.fields || {}).forEach(collectRef);
+    }
+    return targets;
+  }
+
   detectChains(heap) {
     if (!heap || typeof heap !== 'object') return [];
-
     const objIds = Object.keys(heap);
     if (objIds.length === 0) return [];
-
-    /** @type {Map<string, string>} outgoing next pointer: fromId -> toId */
     const nextMap = new Map();
-    /** @type {Map<string, number>} in-degree count of next pointers */
-    const inDegree = new Map();
-
-    for (const id of objIds) {
-      inDegree.set(id, 0);
-    }
-
+    const inDegree = new Map(objIds.map((id) => [id, 0]));
     const findHeapKey = (targetId) => {
       if (heap[targetId]) return targetId;
       const targetNorm = normalizeNodeId(targetId, 'obj');
-      for (const k of objIds) {
-        if (normalizeNodeId(k, 'obj') === targetNorm) return k;
-      }
-      return null;
+      return objIds.find((id) => normalizeNodeId(id, 'obj') === targetNorm) || null;
     };
-
     for (const [id, obj] of Object.entries(heap)) {
       if (!obj) continue;
-      // Check attributes or fields for 'next'
-      const attrs = obj.attrs || obj.fields || {};
-      const nextRef = attrs.next;
+      const nextRef = (obj.attrs || obj.fields || {}).next;
       if (nextRef && (nextRef.kind === 'ref' || nextRef.type === 'ref')) {
-        const rawTargetId = nextRef.target || nextRef.value;
-        if (rawTargetId) {
-          const resolvedTarget = findHeapKey(rawTargetId);
-          if (resolvedTarget) {
-            nextMap.set(id, resolvedTarget);
-            inDegree.set(resolvedTarget, (inDegree.get(resolvedTarget) || 0) + 1);
-          }
+        const target = findHeapKey(nextRef.target || nextRef.value);
+        if (target && target !== id) {
+          nextMap.set(id, target);
+          inDegree.set(target, (inDegree.get(target) || 0) + 1);
         }
       }
     }
-
-    /** @type {Set<string>} */
     const visited = new Set();
-    /** @type {Array<string[]>} */
     const chains = [];
-
-    // First, start chains from nodes with in-degree 0 that have an outgoing next pointer
     for (const id of objIds) {
-      if ((inDegree.get(id) === 0) && nextMap.has(id) && !visited.has(id)) {
-        const chain = [];
-        let curr = id;
-        while (curr && !visited.has(curr) && heap[curr]) {
-          visited.add(curr);
-          chain.push(curr);
-          curr = nextMap.get(curr);
-        }
-        if (chain.length > 0) {
-          chains.push(chain);
-        }
+      if (inDegree.get(id) !== 0 || !nextMap.has(id) || visited.has(id)) continue;
+      const chain = [];
+      let curr = id;
+      while (curr && !visited.has(curr) && heap[curr]) {
+        visited.add(curr);
+        chain.push(curr);
+        curr = nextMap.get(curr);
       }
+      if (chain.length) chains.push(chain);
     }
-
-    // Next, handle any cycles or remaining connected chains
     for (const id of objIds) {
-      if (!visited.has(id) && nextMap.has(id)) {
-        const chain = [];
-        let curr = id;
-        while (curr && !visited.has(curr) && heap[curr]) {
-          visited.add(curr);
-          chain.push(curr);
-          curr = nextMap.get(curr);
-        }
-        if (chain.length > 0) {
-          chains.push(chain);
-        }
+      if (visited.has(id) || !nextMap.has(id)) continue;
+      const chain = [];
+      let curr = id;
+      while (curr && !visited.has(curr) && heap[curr]) {
+        visited.add(curr);
+        chain.push(curr);
+        curr = nextMap.get(curr);
       }
+      if (chain.length) chains.push(chain);
     }
-
     return chains;
   }
 
-  /**
-   * Applies auto-layout for step data.
-   * If resetAll is false, preserves existing positions (especially user-dragged ones).
-   * Only assigns new positions for nodes not yet positioned.
-   * @param {{ stack?: Array<any>, heap?: Record<string, any> }} stepData
-   * @param {boolean} [resetAll=false]
-   * @returns {Map<string, { x: number, y: number, isUserMoved: boolean }>}
-   */
-  applyLayout(stepData, resetAll = false) {
-    if (resetAll) {
-      this.clear();
+  rectsOverlap(a, b, pad = 28) {
+    return !(a.x + a.width + pad <= b.x || b.x + b.width + pad <= a.x ||
+      a.y + a.height + pad <= b.y || b.y + b.height + pad <= a.y);
+  }
+
+  resolveCollisionDown(candX, candY, width, height, placedRects, pad = 30) {
+    let x = Math.round(candX);
+    let y = Math.round(candY);
+    for (let attempt = 0; attempt < 60; attempt++) {
+      const blocker = placedRects.find((r) => this.rectsOverlap({ x, y, width, height }, r, pad));
+      if (!blocker) break;
+      y = Math.round(blocker.y + blocker.height + pad);
     }
+    return { x, y };
+  }
 
-    const stack = (stepData && Array.isArray(stepData.stack)) ? stepData.stack : [];
-    const heap = (stepData && typeof stepData.heap === 'object' && stepData.heap) ? stepData.heap : {};
-
-    // 1. Arrange Stack Frames in left column
-    // Frame IDs formatted as frame-<frame_id> or frame-<index>
-    const frameStartX = 50;
-    const frameStartY = 50;
-    const frameGapY = 170;
-
+  applyLayout(stepData, resetAll = false, sizeMap = null) {
+    if (resetAll) this.clear();
+    const stack = stepData && Array.isArray(stepData.stack) ? stepData.stack : [];
+    const heap = stepData && typeof stepData.heap === 'object' && stepData.heap ? stepData.heap : {};
+    const getSize = (key, isFrame = false) => {
+      const measured = sizeMap?.get(key);
+      if (measured && measured.width > 0 && measured.height > 0) return measured;
+      return isFrame ? { width: 220, height: 120 } : { width: 175, height: 105 };
+    };
+    const isLocked = (key) => !resetAll && Boolean(this.get(key)?.isUserMoved);
+    const placed = [];
+    const frames = [];
     stack.forEach((frame, idx) => {
       if (!frame) return;
-      const rawId = (frame.frame_id !== undefined && frame.frame_id !== null && frame.frame_id !== '') ? frame.frame_id : idx;
-      const frameKey = normalizeNodeId(rawId, 'frame');
-      if (!this.has(frameKey) || (resetAll && !this.get(frameKey)?.isUserMoved)) {
-        const yPos = frameStartY + (idx * frameGapY);
-        this.set(frameKey, frameStartX, yPos, false);
+      const rawId = frame.frame_id !== undefined && frame.frame_id !== null && frame.frame_id !== '' ? frame.frame_id : idx;
+      const key = normalizeNodeId(rawId, 'frame');
+      frames.push({ key, frame });
+      if (isLocked(key)) {
+        const pos = this.get(key), size = getSize(key, true);
+        placed.push({ id: key, x: pos.x, y: pos.y, ...size });
       }
     });
 
-    // 2. Detect Linked List chains in Heap
+    const objIds = Object.keys(heap).filter((id) => heap[id]);
+    for (const rawId of objIds) {
+      const key = normalizeNodeId(rawId, 'obj');
+      if (isLocked(key)) {
+        const pos = this.get(key), size = getSize(key);
+        placed.push({ id: key, x: pos.x, y: pos.y, ...size });
+      }
+    }
+
+    let frameY = 40;
+    let maxStackRight = 260;
+    for (const { key } of frames) {
+      const size = getSize(key, true);
+      if (isLocked(key)) continue;
+      const pos = this.resolveCollisionDown(40, frameY, size.width, size.height, placed, 36);
+      this.set(key, pos.x, pos.y);
+      placed.push({ id: key, ...pos, ...size });
+      frameY = pos.y + size.height + 36;
+      maxStackRight = Math.max(maxStackRight, pos.x + size.width);
+    }
+    if (!objIds.length) return this.positions;
+
+    const findHeapKey = (targetId) => {
+      if (heap[targetId]) return targetId;
+      const normalized = normalizeNodeId(targetId, 'obj');
+      return objIds.find((id) => normalizeNodeId(id, 'obj') === normalized) || null;
+    };
     const chains = this.detectChains(heap);
-    const chainedNodeIds = new Set();
-
-    let chainRowY = 100;
-    chains.forEach((chain) => {
-      chain.forEach((nodeId, k) => {
-        const objKey = normalizeNodeId(nodeId, 'obj');
-        chainedNodeIds.add(objKey);
-        if (!this.has(objKey) || (resetAll && !this.get(objKey)?.isUserMoved)) {
-          const xPos = 360 + (k * 200);
-          this.set(objKey, xPos, chainRowY, false);
+    const inChains = new Set(chains.flat());
+    const chainGroups = chains.map((nodes) => ({ className: heap[nodes[0]]?.class_name || 'ListNode', nodes: [...nodes] }));
+    for (const id of objIds) {
+      if (inChains.has(id) || !this.isChainLikeObject(heap[id])) continue;
+      const className = heap[id]?.class_name || 'ListNode';
+      const group = chainGroups.find((candidate) => candidate.className === className);
+      if (group) group.nodes.push(id);
+      else chainGroups.push({ className, nodes: [id] });
+      inChains.add(id);
+    }
+    const nonChainIds = objIds.filter((id) => !inChains.has(id));
+    const depth = new Map();
+    const parent = new Map();
+    const queue = [];
+    for (const { frame } of frames) {
+      for (const val of Object.values(frame.variables || {})) {
+        if (val && (val.kind === 'ref' || val.type === 'ref')) {
+          const target = findHeapKey(val.target || val.value);
+          if (target && !inChains.has(target) && !depth.has(target)) { depth.set(target, 0); queue.push(target); }
         }
-      });
-      chainRowY += 150;
-    });
-
-    // 3. 2D Grid Layout for remaining Heap Objects
-    const remainingObjIds = Object.keys(heap).filter((id) => !chainedNodeIds.has(normalizeNodeId(id, 'obj')));
-    const gridStartX = 360;
-    const gridStartY = Math.max(280, chainRowY);
-    const gridColWidth = 240;
-    const gridRowHeight = 180;
-    const maxCols = 3;
-
-    let gridIndex = 0;
-    remainingObjIds.forEach((id) => {
-      const objKey = normalizeNodeId(id, 'obj');
-      if (!this.has(objKey) || (resetAll && !this.get(objKey)?.isUserMoved)) {
-        // Find next non-colliding cell
-        let col = gridIndex % maxCols;
-        let row = Math.floor(gridIndex / maxCols);
-        let candX = gridStartX + (col * gridColWidth);
-        let candY = gridStartY + (row * gridRowHeight);
-
-        // Check simple collision with already placed nodes
-        while (this.hasCollision(candX, candY, objKey)) {
-          gridIndex++;
-          col = gridIndex % maxCols;
-          row = Math.floor(gridIndex / maxCols);
-          candX = gridStartX + (col * gridColWidth);
-          candY = gridStartY + (row * gridRowHeight);
-        }
-
-        this.set(objKey, candX, candY, false);
-        gridIndex++;
       }
-    });
+      const ret = frame.return_value;
+      if (ret && (ret.kind === 'ref' || ret.type === 'ref')) {
+        const target = findHeapKey(ret.target || ret.value);
+        if (target && !inChains.has(target) && !depth.has(target)) { depth.set(target, 0); queue.push(target); }
+      }
+    }
+    for (const id of nonChainIds) {
+      if (!depth.has(id)) { depth.set(id, 0); queue.push(id); }
+    }
+    while (queue.length) {
+      const current = queue.shift();
+      const currentDepth = depth.get(current) || 0;
+      for (const target of this.extractHeapOutgoingRefs(heap[current], objIds, findHeapKey)) {
+        if (inChains.has(target)) continue;
+        if ((!depth.has(target) || depth.get(target) < currentDepth + 1) && currentDepth + 1 <= nonChainIds.length) {
+          depth.set(target, currentDepth + 1);
+          if (!parent.has(target)) parent.set(target, current);
+          queue.push(target);
+        }
+      }
+    }
 
+    const heapStartX = Math.max(360, maxStackRight + 115);
+    const colGapX = 95;
+    const rowGapY = 44;
+    const columns = new Map();
+    for (const id of nonChainIds) {
+      const d = depth.get(id) || 0;
+      if (!columns.has(d)) columns.set(d, []);
+      columns.get(d).push(id);
+    }
+    const placedNonChains = new Map();
+    let x = heapStartX;
+    let maxNonChainRight = heapStartX;
+    for (const d of [...columns.keys()].sort((a, b) => a - b)) {
+      let y = 40;
+      let colRight = x + 170;
+      for (const rawId of columns.get(d)) {
+        const key = normalizeNodeId(rawId, 'obj'), size = getSize(key);
+        if (isLocked(key)) {
+          const pos = this.get(key);
+          placedNonChains.set(rawId, { x: pos.x, y: pos.y, ...size });
+          continue;
+        }
+        const parentId = parent.get(rawId);
+        const preferredY = parentId && placedNonChains.has(parentId)
+          ? Math.max(y, placedNonChains.get(parentId).y) : y;
+        const pos = this.resolveCollisionDown(x, preferredY, size.width, size.height, placed, rowGapY);
+        this.set(key, pos.x, pos.y);
+        const rect = { id: key, ...pos, ...size };
+        placed.push(rect);
+        placedNonChains.set(rawId, rect);
+        y = pos.y + size.height + rowGapY;
+        colRight = Math.max(colRight, pos.x + size.width);
+      }
+      maxNonChainRight = Math.max(maxNonChainRight, colRight);
+      x = colRight + colGapX;
+    }
+
+    if (chainGroups.length) {
+      const chainGapX = 85;
+      const chainStartX = nonChainIds.length ? maxNonChainRight + colGapX : heapStartX;
+      const ownerY = (headId) => {
+        for (const id of nonChainIds) {
+          if (this.extractHeapOutgoingRefs(heap[id], objIds, findHeapKey).includes(headId) && placedNonChains.has(id)) {
+            return placedNonChains.get(id).y;
+          }
+        }
+        return null;
+      };
+      let rowY = 60;
+      for (const group of chainGroups) {
+        const owner = group.nodes.length ? ownerY(group.nodes[0]) : null;
+        const baseY = owner === null ? rowY : Math.max(40, owner);
+        let cursorX = chainStartX;
+        let bottom = baseY + 100;
+        for (const rawId of group.nodes) {
+          const key = normalizeNodeId(rawId, 'obj'), size = getSize(key);
+          if (isLocked(key)) {
+            const pos = this.get(key);
+            if (Math.abs(pos.y - baseY) < 80) cursorX = Math.max(cursorX, pos.x + size.width + chainGapX);
+            continue;
+          }
+          const pos = this.resolveCollisionDown(cursorX, baseY, size.width, size.height, placed, 36);
+          this.set(key, pos.x, pos.y);
+          placed.push({ id: key, ...pos, ...size });
+          cursorX = pos.x + size.width + chainGapX;
+          bottom = Math.max(bottom, pos.y + size.height);
+        }
+        rowY = bottom + 75;
+      }
+    }
     return this.positions;
   }
 
-  /**
-   * Helper to detect overlapping nodes in auto-layout.
-   * @param {number} x
-   * @param {number} y
-   * @param {string} excludeId
-   * @returns {boolean}
-   */
   hasCollision(x, y, excludeId) {
     for (const [id, pos] of this.positions.entries()) {
       if (id === excludeId) continue;
-      if (Math.abs(pos.x - x) < 180 && Math.abs(pos.y - y) < 130) {
-        return true;
-      }
+      if (Math.abs(pos.x - x) < 180 && Math.abs(pos.y - y) < 130) return true;
     }
     return false;
   }

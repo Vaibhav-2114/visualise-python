@@ -336,7 +336,9 @@ export class ArrowRenderer {
     // Stagger landing along target left edge if multiple inbound
     let landingY = targetRect.y + (targetRect.height * 0.5);
     if (totalInbound > 1) {
-      landingY = targetRect.y + ((inboundIndex + 1) / (totalInbound + 1)) * targetRect.height;
+      const margin = Math.min(18, targetRect.height * 0.2);
+      const usableHeight = Math.max(10, targetRect.height - margin * 2);
+      landingY = targetRect.y + margin + ((inboundIndex + 0.5) / totalInbound) * usableHeight;
     }
 
     // Bidirectional cycle offset
@@ -345,10 +347,9 @@ export class ArrowRenderer {
       yOffset = isReversePair ? -15 : 15;
     }
 
-    if (targetCenterX < Sx - 40) {
-      // Case: Backward Reference (Target is to the left)
-      // Loop over the top using backward arch
-      return this.generateBackwardArchPath(Sx, Sy, targetRect, yOffset, landingY);
+    if (targetCenterX < Sx - 20) {
+      // Route backward references overhead so they clear both card headers.
+      return this.generateBackwardArchPath(Sx, Sy, targetRect, yOffset, landingY, sourceRect, inboundIndex);
     } else {
       // Case: Forward Reference (Target to the right or aligned)
       Tx = targetRect.x;
@@ -373,31 +374,27 @@ export class ArrowRenderer {
   }
 
   /**
-   * Backward Arch Path (loops overhead without intersecting cards)
-   * @param {number} Sx Source X
-   * @param {number} Sy Source Y
+   * Routes backward pointers above both source and target cards.
+   * @param {number} Sx
+   * @param {number} Sy
    * @param {{ x: number, y: number, width: number, height: number }} targetRect
    * @param {number} [yOffset=0]
    * @param {number | null} [landingY=null]
+   * @param {{ x: number, y: number, width: number, height: number } | null} [sourceRect=null]
+   * @param {number} [staggerIndex=0]
    * @returns {string} SVG path string
    */
-  generateBackwardArchPath(Sx, Sy, targetRect, yOffset = 0, landingY = null) {
-    // Target enters right edge or staggered position
+  generateBackwardArchPath(Sx, Sy, targetRect, yOffset = 0, landingY = null, sourceRect = null, staggerIndex = 0) {
     const Tx = Math.round(targetRect.x + targetRect.width);
     const resolvedLandingY = (landingY !== null && landingY !== undefined && Number.isFinite(landingY))
       ? landingY + yOffset
       : (targetRect.y + (targetRect.height * 0.5) + yOffset);
-    const Ty = Math.round(resolvedLandingY);
-
-    // Overhead arch: min(Sy, Ty) - 60
-    const Yarch = Math.round(Math.min(Sy, Ty) - 60 + yOffset);
-
-    const C1x = Math.round(Sx + 50);
-    const C1y = Yarch;
-    const C2x = Math.round(Tx + 50);
-    const C2y = Yarch;
-
-    return `M ${Math.round(Sx)} ${Math.round(Sy)} C ${C1x} ${C1y}, ${C2x} ${C2y}, ${Tx} ${Ty}`;
+    const Ty = Math.round(Math.max(targetRect.y + 12, Math.min(targetRect.y + targetRect.height - 12, resolvedLandingY)));
+    const topMost = sourceRect ? Math.min(sourceRect.y, targetRect.y) : Math.min(Sy, Ty) - 20;
+    const Yarch = Math.round(topMost - 42 - (staggerIndex * 14) + Math.min(0, yOffset));
+    const C1x = Math.round(Sx + 46);
+    const C2x = Math.round(Tx + 46);
+    return `M ${Math.round(Sx)} ${Math.round(Sy)} C ${C1x} ${Yarch}, ${C2x} ${Yarch}, ${Tx} ${Ty}`;
   }
 
   /**

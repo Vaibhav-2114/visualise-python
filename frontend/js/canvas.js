@@ -30,6 +30,8 @@ export class CanvasManager {
     this.scale = 1.0;
     this.minScale = 0.25;
     this.maxScale = 2.5;
+    this.userAdjustedViewport = false;
+    this.hasAutoFittedOnce = false;
 
     // Associated managers
     this.positionStore = options.positionStore || new PositionStore();
@@ -110,7 +112,9 @@ export class CanvasManager {
     this.positionStore.clear();
     this.prevStepData = null;
     this.prevValuesMap = new Map();
-    this.resetZoom();
+    this.userAdjustedViewport = false;
+    this.hasAutoFittedOnce = false;
+    this.resetZoom(false);
   }
 
   /**
@@ -133,6 +137,7 @@ export class CanvasManager {
   panBy(dx, dy) {
     this.panX += dx;
     this.panY += dy;
+    this.userAdjustedViewport = true;
     this.updateTransform();
   }
 
@@ -162,6 +167,7 @@ export class CanvasManager {
     this.panX = Xs - (Xs - this.panX) * ratio;
     this.panY = Ys - (Ys - this.panY) * ratio;
     this.scale = newScale;
+    this.userAdjustedViewport = true;
 
     this.updateTransform();
   }
@@ -169,10 +175,11 @@ export class CanvasManager {
   /**
    * Reset zoom and pan to defaults.
    */
-  resetZoom() {
+  resetZoom(isUserAction = true) {
     this.panX = 0;
     this.panY = 0;
     this.scale = 1.0;
+    if (isUserAction) this.userAdjustedViewport = true;
     this.updateTransform();
   }
 
@@ -219,66 +226,50 @@ export class CanvasManager {
   }
 
   /**
-   * Fits all active nodes cleanly into the viewport.
-   * @param {Array<{ x: number, y: number, width?: number, height?: number }>} [customBoxes]
+   * Measures active DOM nodes, falling back to PositionStore for headless tests.
+   * @returns {Array<{ id: string, x: number, y: number, width: number, height: number }>}
    */
-  fitToView(customBoxes = null) {
-    let boxes = customBoxes;
-    if (!boxes) {
-      boxes = [];
-      const activeNodes = this.nodesLayer ? this.nodesLayer.querySelectorAll('.canvas-node') : [];
-      if (activeNodes.length > 0) {
-        activeNodes.forEach((el) => {
-          const pos = this.positionStore.get(el.id) || { x: el.offsetLeft || 0, y: el.offsetTop || 0 };
-          boxes.push({
-            x: pos.x,
-            y: pos.y,
-            width: el.offsetWidth || 180,
-            height: el.offsetHeight || 120
-          });
-        });
-      } else {
-        const positions = this.positionStore.getAll();
-        for (const [id, pos] of Object.entries(positions)) {
-          let width = 180;
-          let height = 120;
-          if (this.nodesLayer) {
-            const el = this.nodesLayer.querySelector(`#${id}`);
-            if (el) {
-              width = el.offsetWidth || 180;
-              height = el.offsetHeight || 120;
-            }
-          }
-          boxes.push({ x: pos.x, y: pos.y, width, height });
-        }
+  getActiveNodeBoxes() {
+    const boxes = [];
+    const activeNodes = this.nodesLayer ? this.nodesLayer.querySelectorAll('.canvas-node') : [];
+    if (activeNodes.length > 0) {
+      activeNodes.forEach((el) => {
+        const pos = this.positionStore.get(el.id) || { x: el.offsetLeft || 0, y: el.offsetTop || 0 };
+        boxes.push({ id: el.id, x: pos.x, y: pos.y, width: el.offsetWidth || 180, height: el.offsetHeight || 120 });
+      });
+    } else {
+      for (const [id, pos] of Object.entries(this.positionStore.getAll())) {
+        boxes.push({ id, x: pos.x, y: pos.y, width: 180, height: 120 });
       }
     }
+    return boxes;
+  }
 
-    if (!boxes || boxes.length === 0) {
-      this.resetZoom();
+  /**
+   * Fits all active nodes and resumes smart auto-fit.
+   * @param {Array<{ x: number, y: number, width?: number, height?: number }>} [customBoxes]
+   * @param {number} [maxFitScale=1.05]
+   */
+  fitToView(customBoxes = null, maxFitScale = 1.05) {
+    const boxes = customBoxes || this.getActiveNodeBoxes();
+    this.userAdjustedViewport = false;
+    if (!boxes.length) {
+      this.resetZoom(false);
       return;
     }
 
-    let minX = Infinity;
-    let minY = Infinity;
-    let maxX = -Infinity;
-    let maxY = -Infinity;
-
-    for (const b of boxes) {
-      const w = b.width || 180;
-      const h = b.height || 120;
-      minX = Math.min(minX, b.x);
-      minY = Math.min(minY, b.y);
-      maxX = Math.max(maxX, b.x + w);
-      maxY = Math.max(maxY, b.y + h);
+    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+    for (const box of boxes) {
+      minX = Math.min(minX, box.x);
+      minY = Math.min(minY, box.y);
+      maxX = Math.max(maxX, box.x + (box.width || 180));
+      maxY = Math.max(maxY, box.y + (box.height || 120));
     }
 
-    const padding = 60;
-    const contentWidth = Math.max(100, maxX - minX + (padding * 2));
-    const contentHeight = Math.max(100, maxY - minY + (padding * 2));
-
-    let vpWidth = 800;
-    let vpHeight = 600;
+    const padLeft = 56, padRight = 64, padTop = 76, padBottom = 80;
+    const contentWidth = Math.max(120, maxX - minX + padLeft + padRight);
+    const contentHeight = Math.max(120, maxY - minY + padTop + padBottom);
+    let vpWidth = 800, vpHeight = 600;
     if (this.viewport && typeof this.viewport.getBoundingClientRect === 'function') {
       const rect = this.viewport.getBoundingClientRect();
       vpWidth = rect.width || 800;
@@ -287,16 +278,37 @@ export class CanvasManager {
 
     const scaleX = vpWidth / contentWidth;
     const scaleY = vpHeight / contentHeight;
-    const fittedScale = Math.max(this.minScale, Math.min(1.5, Math.min(scaleX, scaleY)));
-
-    const contentCenterX = (minX + maxX) * 0.5;
-    const contentCenterY = (minY + maxY) * 0.5;
-
+    const fittedScale = Math.max(this.minScale, Math.min(maxFitScale, Math.min(scaleX, scaleY)));
+    const centerX = (minX - padLeft + maxX + padRight) * 0.5;
+    const centerY = (minY - padTop + maxY + padBottom) * 0.5;
     this.scale = fittedScale;
-    this.panX = (vpWidth * 0.5) - (contentCenterX * fittedScale);
-    this.panY = (vpHeight * 0.5) - (contentCenterY * fittedScale);
-
+    this.panX = vpWidth * 0.5 - centerX * fittedScale;
+    this.panY = vpHeight * 0.5 - centerY * fittedScale;
+    this.hasAutoFittedOnce = true;
     this.updateTransform();
+  }
+
+  autoFitIfNeeded() {
+    if (this.userAdjustedViewport || !this.viewport) return;
+    const boxes = this.getActiveNodeBoxes();
+    if (!boxes.length) return;
+    if (!this.hasAutoFittedOnce) {
+      this.fitToView(boxes, 1.0);
+      return;
+    }
+    const rect = typeof this.viewport.getBoundingClientRect === 'function'
+      ? this.viewport.getBoundingClientRect() : { width: 800, height: 600 };
+    const width = rect.width || 800, height = rect.height || 600;
+    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+    for (const box of boxes) {
+      minX = Math.min(minX, this.panX + box.x * this.scale);
+      minY = Math.min(minY, this.panY + box.y * this.scale);
+      maxX = Math.max(maxX, this.panX + (box.x + box.width) * this.scale);
+      maxY = Math.max(maxY, this.panY + (box.y + box.height) * this.scale);
+    }
+    const outOfBounds = minX < 24 || minY < 44 || maxX > width - 28 || maxY > height - 64;
+    const tiny = this.scale < 0.85 && maxX - minX < width * 0.45 && maxY - minY < height * 0.45;
+    if (outOfBounds || tiny) this.fitToView(boxes, 1.0);
   }
 
   /**
@@ -311,7 +323,8 @@ export class CanvasManager {
       nodes.forEach((n) => n.classList.add('is-animating'));
     }
 
-    this.positionStore.applyLayout(this.prevStepData, true);
+    const sizeMap = this.measureActiveNodeSizes();
+    this.positionStore.applyLayout(this.prevStepData, true, sizeMap);
 
     // Apply new positions
     if (this.nodesLayer) {
@@ -323,6 +336,9 @@ export class CanvasManager {
         }
       }
     }
+
+    this.fitToView(null, 1.05);
+    this.renderEdgesFromStep(this.prevStepData);
 
     // Refresh arrows after the CSS transition settles
     setTimeout(() => {
@@ -377,6 +393,7 @@ export class CanvasManager {
     if (!this.isPanning) return;
     const dx = e.clientX - this.panStartX;
     const dy = e.clientY - this.panStartY;
+    if (Math.abs(dx) > 2 || Math.abs(dy) > 2) this.userAdjustedViewport = true;
     this.panX = this.lastPanX + dx;
     this.panY = this.lastPanY + dy;
     this.updateTransform();
@@ -392,6 +409,19 @@ export class CanvasManager {
     if (this.viewport) {
       this.viewport.style.cursor = '';
     }
+  }
+
+  /**
+   * Measures rendered card dimensions for topology-aware layout.
+   * @returns {Map<string, { width: number, height: number }>}
+   */
+  measureActiveNodeSizes() {
+    const sizes = new Map();
+    if (!this.nodesLayer) return sizes;
+    this.nodesLayer.querySelectorAll('.canvas-node').forEach((el) => {
+      if (el.id) sizes.set(el.id, { width: el.offsetWidth || 180, height: el.offsetHeight || 110 });
+    });
+    return sizes;
   }
 
   /**
@@ -447,9 +477,6 @@ export class CanvasManager {
     if (!stepData) return;
     this.prevStepData = stepData;
 
-    // Apply auto-layout for any newly discovered unpositioned nodes
-    this.positionStore.applyLayout(stepData, false);
-
     const stack = Array.isArray(stepData.stack) ? stepData.stack : [];
     const heap = (stepData.heap && typeof stepData.heap === 'object') ? stepData.heap : {};
 
@@ -457,7 +484,7 @@ export class CanvasManager {
     const currentValuesMap = new Map();
     const changedKeys = new Set();
 
-    // 1. Render / Update Stack Frames
+    // Pass 1: Render all cards before measuring their actual dimensions.
     stack.forEach((frame, idx) => {
       if (!frame) return;
       const rawId = (frame.frame_id !== undefined && frame.frame_id !== null && frame.frame_id !== '') ? frame.frame_id : idx;
@@ -474,21 +501,30 @@ export class CanvasManager {
       this.renderHeapObjectNode(objId, obj, currentValuesMap, changedKeys);
     }
 
-    // 3. Diff and remove dead nodes
+    // Remove nodes no longer present in the step.
     if (this.nodesLayer) {
-      const existingNodes = this.nodesLayer.querySelectorAll('.canvas-node');
-      existingNodes.forEach((nodeEl) => {
-        if (!activeNodeIds.has(nodeEl.id)) {
-          nodeEl.remove();
-        }
+      this.nodesLayer.querySelectorAll('.canvas-node').forEach((nodeEl) => {
+        if (!activeNodeIds.has(nodeEl.id)) nodeEl.remove();
       });
     }
 
-    // 4. Update values map for pulse animation diffing on next step
+    // Pass 2: Use measured card sizes to compute a fresh topology-aware layout.
+    const sizeMap = this.measureActiveNodeSizes();
+    this.positionStore.applyLayout(stepData, false, sizeMap);
+    if (this.nodesLayer) {
+      for (const nodeId of activeNodeIds) {
+        const nodeEl = this.nodesLayer.querySelector(`#${nodeId}`);
+        const pos = this.positionStore.get(nodeId);
+        if (nodeEl && pos) nodeEl.style.transform = `translate3d(${pos.x}px, ${pos.y}px, 0)`;
+      }
+    }
+
+    // Update values map for pulse animation diffing on next step
     this.prevValuesMap = currentValuesMap;
 
-    // 5. Render Reference Connection Edges
+    // Render arrows against final card positions, then adapt the view only if needed.
     this.renderEdgesFromStep(stepData, changedKeys);
+    this.autoFitIfNeeded();
   }
 
   /**
