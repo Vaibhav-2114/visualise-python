@@ -54,6 +54,7 @@ export class CanvasManager {
     this.panStartY = 0;
     this.lastPanX = 0;
     this.lastPanY = 0;
+    this.hoveredNodeId = null;
 
     // Step state tracking for diffing
     this.prevStepData = null;
@@ -64,6 +65,8 @@ export class CanvasManager {
     this.onViewportPointerDown = this.onViewportPointerDown.bind(this);
     this.onViewportPointerMove = this.onViewportPointerMove.bind(this);
     this.onViewportPointerUp = this.onViewportPointerUp.bind(this);
+    this.onNodesMouseOver = this.onNodesMouseOver.bind(this);
+    this.onNodesMouseOut = this.onNodesMouseOut.bind(this);
 
     if (this.viewport) {
       this.initEvents();
@@ -81,6 +84,8 @@ export class CanvasManager {
     window.addEventListener('pointermove', this.onViewportPointerMove);
     window.addEventListener('pointerup', this.onViewportPointerUp);
     window.addEventListener('pointercancel', this.onViewportPointerUp);
+    this.nodesLayer?.addEventListener('mouseover', this.onNodesMouseOver);
+    this.nodesLayer?.addEventListener('mouseout', this.onNodesMouseOut);
   }
 
   /**
@@ -90,11 +95,29 @@ export class CanvasManager {
     if (!this.viewport) return;
     this.viewport.removeEventListener('wheel', this.onWheel);
     this.viewport.removeEventListener('pointerdown', this.onViewportPointerDown);
+    this.nodesLayer?.removeEventListener('mouseover', this.onNodesMouseOver);
+    this.nodesLayer?.removeEventListener('mouseout', this.onNodesMouseOut);
     if (typeof window !== 'undefined') {
       window.removeEventListener('pointermove', this.onViewportPointerMove);
       window.removeEventListener('pointerup', this.onViewportPointerUp);
       window.removeEventListener('pointercancel', this.onViewportPointerUp);
     }
+  }
+
+  onNodesMouseOver(event) {
+    if (this.dragManager?.state?.active) return;
+    const node = event.target?.closest?.('.canvas-node');
+    if (!node?.id || this.hoveredNodeId === node.id) return;
+    this.hoveredNodeId = node.id;
+    this.arrowRenderer?.highlightNodeConnections(node.id);
+  }
+
+  onNodesMouseOut(event) {
+    if (!this.hoveredNodeId) return;
+    const next = event.relatedTarget?.closest?.('.canvas-node');
+    if (next?.id === this.hoveredNodeId) return;
+    this.hoveredNodeId = null;
+    this.arrowRenderer?.clearConnectionFocus();
   }
 
   /**
@@ -447,6 +470,9 @@ export class CanvasManager {
         if (t === 'none' || raw === null || raw === undefined) {
           return { typeStr: 'NoneType', displayText: 'None', valClass: 'val-none' };
         }
+        if (t === 'float' && raw === 'Infinity') return { typeStr: 'float', displayText: 'inf', valClass: '' };
+        if (t === 'float' && raw === '-Infinity') return { typeStr: 'float', displayText: '-inf', valClass: '' };
+        if (t === 'float' && raw === 'NaN') return { typeStr: 'float', displayText: 'nan', valClass: '' };
         if (t === 'bool' || typeof raw === 'boolean') {
           return { typeStr: 'bool', displayText: raw ? 'True' : 'False', valClass: 'val-bool' };
         }
@@ -524,6 +550,12 @@ export class CanvasManager {
 
     // Render arrows against final card positions, then adapt the view only if needed.
     this.renderEdgesFromStep(stepData, changedKeys);
+    if (this.hoveredNodeId && activeNodeIds.has(this.hoveredNodeId)) {
+      this.arrowRenderer?.highlightNodeConnections(this.hoveredNodeId);
+    } else {
+      this.hoveredNodeId = null;
+      this.arrowRenderer?.clearConnectionFocus();
+    }
     this.autoFitIfNeeded();
   }
 
@@ -595,7 +627,7 @@ export class CanvasManager {
       }
     }
 
-    if (frame.return_value !== null && frame.return_value !== undefined) {
+    if (funcName !== '<module>' && frame.return_value !== null && frame.return_value !== undefined) {
       const retVal = frame.return_value;
       if (retVal && (retVal.kind === 'ref' || retVal.type === 'ref')) {
         const rawTarget = retVal.target || retVal.value;

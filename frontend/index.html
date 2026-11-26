@@ -362,8 +362,8 @@
     #code-highlights.word-wrap-on {
       right: auto;
       white-space: pre-wrap;
-      overflow-wrap: anywhere;
-      word-break: break-word;
+      overflow-wrap: break-word;
+      word-break: normal;
     }
 
     .highlight-line {
@@ -372,8 +372,6 @@
       height: 21px;
       min-width: 100%;
       width: max-content;
-      border-left: 3px solid transparent;
-      margin-left: -3px;
       border-radius: 2px;
     }
 
@@ -385,22 +383,22 @@
 
     .highlight-line.executed-exec {
       background: rgba(16, 185, 129, 0.14);
-      border-left-color: var(--success);
+      box-shadow: inset 3px 0 var(--success);
     }
 
     .highlight-line.next-exec {
       background: rgba(245, 158, 11, 0.15);
-      border-left-color: var(--warning);
+      box-shadow: inset 3px 0 var(--warning);
     }
 
     .highlight-line.both-exec {
       background: linear-gradient(90deg, rgba(16, 185, 129, 0.18), rgba(245, 158, 11, 0.18));
-      border-left-color: var(--warning);
+      box-shadow: inset 3px 0 var(--warning);
     }
 
     .highlight-line.error-exec {
       background: rgba(239, 68, 68, 0.14);
-      border-left-color: var(--error);
+      box-shadow: inset 3px 0 var(--error);
     }
 
     .hl-indent,
@@ -441,8 +439,8 @@
 
     #code-editor.word-wrap-on {
       white-space: pre-wrap;
-      overflow-wrap: anywhere;
-      word-break: break-word;
+      overflow-wrap: break-word;
+      word-break: normal;
       overflow-x: hidden;
     }
 
@@ -1313,15 +1311,18 @@ print(f"Sum of even squares: {total}")`
         return;
       }
 
-      codeHighlights.style.width = `${codeEditor.clientWidth}px`;
-      const hlRows = codeHighlights.querySelectorAll('.highlight-line');
-      const lnRows = lineNumbers.querySelectorAll('.line-number');
-      const count = Math.min(hlRows.length, lnRows.length);
-      for (let i = 0; i < count; i++) {
-        const h = hlRows[i].offsetHeight || LINE_HEIGHT;
-        lnRows[i].style.height = `${h}px`;
-      }
-      syncEditorScroll();
+      // Defer until textarea scrollbar and wrapped text layout have settled.
+      requestAnimationFrame(() => {
+        codeHighlights.style.width = `${codeEditor.clientWidth}px`;
+        const hlRows = codeHighlights.querySelectorAll('.highlight-line');
+        const lnRows = lineNumbers.querySelectorAll('.line-number');
+        const count = Math.min(hlRows.length, lnRows.length);
+        for (let i = 0; i < count; i++) {
+          const h = hlRows[i].offsetHeight || LINE_HEIGHT;
+          lnRows[i].style.height = `${h}px`;
+        }
+        syncEditorScroll();
+      });
     }
 
     function updateLineNumbers() {
@@ -1458,20 +1459,14 @@ print(f"Sum of even squares: {total}")`
       const totalLines = codeEditor.value.split('\n').length;
       const clamped = Math.max(1, Math.min(lineNo, totalLines));
 
-      let lineTop = (clamped - 1) * LINE_HEIGHT;
-      if (wordWrapEnabled) {
-        const hlRow = codeHighlights.children[clamped - 1];
-        if (hlRow) {
-          lineTop = Math.max(0, hlRow.offsetTop - 12);
-        }
-      }
-
+      const hlRow = wordWrapEnabled ? codeHighlights.children[clamped - 1] : null;
+      const lineTop = hlRow ? Math.max(0, hlRow.offsetTop) : (clamped - 1) * LINE_HEIGHT;
+      const lineHeight = hlRow ? (hlRow.offsetHeight || LINE_HEIGHT) : LINE_HEIGHT;
       const editorHeight = codeEditor.clientHeight;
-      const editorPadding = 12;
       const visibleTop = codeEditor.scrollTop;
-      const visibleBottom = visibleTop + editorHeight - editorPadding * 2;
+      const visibleBottom = visibleTop + editorHeight;
 
-      if (lineTop < visibleTop || lineTop > visibleBottom - LINE_HEIGHT) {
+      if (lineTop < visibleTop || lineTop + lineHeight > visibleBottom - 12) {
         codeEditor.scrollTop = Math.max(0, lineTop - editorHeight / 3);
       }
       syncEditorScroll();

@@ -179,10 +179,10 @@ export class PositionStore {
     for (const { key } of frames) {
       const size = getSize(key, true);
       if (isLocked(key)) continue;
-      const pos = this.resolveCollisionDown(40, frameY, size.width, size.height, placed, 36);
+      const pos = this.resolveCollisionDown(40, frameY, size.width, size.height, placed, 24);
       this.set(key, pos.x, pos.y);
       placed.push({ id: key, ...pos, ...size });
-      frameY = pos.y + size.height + 36;
+      frameY = pos.y + size.height + 24;
       maxStackRight = Math.max(maxStackRight, pos.x + size.width);
     }
     if (!objIds.length) return this.positions;
@@ -205,7 +205,7 @@ export class PositionStore {
     }
     const nonChainIds = objIds.filter((id) => !inChains.has(id));
     const depth = new Map();
-    const parent = new Map();
+    const parents = new Map(nonChainIds.map((id) => [id, new Set()]));
     const queue = [];
     for (const { frame } of frames) {
       for (const val of Object.values(frame.variables || {})) {
@@ -228,9 +228,9 @@ export class PositionStore {
       const currentDepth = depth.get(current) || 0;
       for (const target of this.extractHeapOutgoingRefs(heap[current], objIds, findHeapKey)) {
         if (inChains.has(target)) continue;
+        parents.get(target)?.add(current);
         if ((!depth.has(target) || depth.get(target) < currentDepth + 1) && currentDepth + 1 <= nonChainIds.length) {
           depth.set(target, currentDepth + 1);
-          if (!parent.has(target)) parent.set(target, current);
           queue.push(target);
         }
       }
@@ -238,7 +238,7 @@ export class PositionStore {
 
     const heapStartX = Math.max(360, maxStackRight + 115);
     const colGapX = 95;
-    const rowGapY = 44;
+    const rowGapY = 28;
     const columns = new Map();
     for (const id of nonChainIds) {
       const d = depth.get(id) || 0;
@@ -248,19 +248,38 @@ export class PositionStore {
     const placedNonChains = new Map();
     let x = heapStartX;
     let maxNonChainRight = heapStartX;
-    for (const d of [...columns.keys()].sort((a, b) => a - b)) {
+    const depths = [...columns.keys()].sort((a, b) => a - b);
+    for (const d of depths) {
+      const colIds = [...columns.get(d)];
+      if (d > 0) {
+        const barycenter = (id) => {
+          const pset = parents.get(id);
+          if (!pset?.size) return null;
+          const centers = [...pset].map((p) => placedNonChains.get(p))
+            .filter(Boolean).map((rect) => rect.y + rect.height / 2);
+          return centers.length ? centers.reduce((sum, value) => sum + value, 0) / centers.length : null;
+        };
+        colIds.sort((a, b) => {
+          const ay = barycenter(a), by = barycenter(b);
+          if (ay === null) return by === null ? 0 : 1;
+          if (by === null) return -1;
+          return ay - by;
+        });
+      }
       let y = 40;
       let colRight = x + 170;
-      for (const rawId of columns.get(d)) {
+      for (const rawId of colIds) {
         const key = normalizeNodeId(rawId, 'obj'), size = getSize(key);
         if (isLocked(key)) {
           const pos = this.get(key);
           placedNonChains.set(rawId, { x: pos.x, y: pos.y, ...size });
           continue;
         }
-        const parentId = parent.get(rawId);
-        const preferredY = parentId && placedNonChains.has(parentId)
-          ? Math.max(y, placedNonChains.get(parentId).y) : y;
+        const parentRects = [...(parents.get(rawId) || [])].map((id) => placedNonChains.get(id)).filter(Boolean);
+        const baryY = parentRects.length
+          ? parentRects.reduce((sum, rect) => sum + rect.y + rect.height / 2, 0) / parentRects.length
+          : null;
+        const preferredY = baryY === null ? y : Math.max(y, Math.round(baryY - size.height / 2));
         const pos = this.resolveCollisionDown(x, preferredY, size.width, size.height, placed, rowGapY);
         this.set(key, pos.x, pos.y);
         const rect = { id: key, ...pos, ...size };

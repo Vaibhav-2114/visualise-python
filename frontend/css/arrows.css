@@ -15,6 +15,27 @@
 .pointer-group {
   pointer-events: none;
   cursor: pointer;
+  transition: opacity 0.16s ease;
+}
+
+.pointer-group.dimmed {
+  opacity: 0.14;
+}
+
+.pointer-group.focus-active .pointer-line {
+  stroke-width: 3.5px;
+  stroke: #a5b4fc;
+  filter: drop-shadow(0 0 6px rgba(129, 140, 248, 0.85));
+}
+
+.pointer-group.focus-active .pointer-line.highlight {
+  stroke: #fbbf24;
+  stroke-width: 4px;
+}
+
+.pointer-group.focus-active .pointer-line.return {
+  stroke: #34d399;
+  stroke-width: 3.5px;
 }
 
 /* Invisible wide hitarea for easy hover/clicking */
@@ -29,7 +50,7 @@
 /* Visible Crisp Vector Path */
 .pointer-line {
   stroke: #6366f1;
-  stroke-width: 2.5px;
+  stroke-width: 2.25px;
   marker-end: url(#arrowhead);
   fill: none;
   stroke-linecap: round;

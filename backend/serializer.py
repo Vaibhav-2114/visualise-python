@@ -33,6 +33,15 @@ class Serializer:
         self._id_map: Dict[int, str] = {}
         self._next_id: int = 1
 
+    def _is_typing_object(self, val: Any) -> bool:
+        """Return whether val is a typing annotation or runtime type alias."""
+        cls = getattr(val, "__class__", None)
+        if cls is not None and getattr(cls, "__module__", None) == "typing":
+            return True
+        if isinstance(val, types.GenericAlias):
+            return True
+        return hasattr(types, "UnionType") and isinstance(val, types.UnionType)
+
     def is_reference(self, val: Any) -> bool:
         """Determines whether a value should be allocated as a heap object reference."""
         if val is None:
@@ -47,6 +56,8 @@ class Serializer:
         if isinstance(val, (types.FunctionType, types.BuiltinFunctionType, types.MethodType)):
             return False
         if isinstance(val, types.ModuleType):
+            return False
+        if self._is_typing_object(val):
             return False
         # Containers on heap
         if isinstance(val, (list, dict, set, tuple)):
@@ -109,6 +120,11 @@ class Serializer:
 
         if isinstance(val, type):
             return {"kind": "class", "name": val.__name__}
+
+        if self._is_typing_object(val):
+            name = getattr(val, "_name", None) or getattr(val, "__name__", None) or repr(val)
+            name = str(name).replace("typing.", "")
+            return {"kind": "class", "name": name if name.startswith("typing.") else f"typing.{name}"}
 
         if isinstance(val, (types.FunctionType, types.BuiltinFunctionType, types.MethodType)):
             line = getattr(getattr(val, "__code__", None), "co_firstlineno", None)
@@ -213,6 +229,7 @@ class Serializer:
                     "type": "list",
                     "items": items,
                     "length": len(obj),
+                    **({"class_name": type(obj).__name__} if type(obj) is not list else {}),
                 }
 
             elif isinstance(obj, tuple):
@@ -225,6 +242,7 @@ class Serializer:
                     "type": "tuple",
                     "items": items,
                     "length": len(obj),
+                    **({"class_name": type(obj).__name__} if type(obj) is not tuple else {}),
                 }
 
             elif isinstance(obj, set):
@@ -237,6 +255,7 @@ class Serializer:
                     "type": "set",
                     "items": items,
                     "length": len(obj),
+                    **({"class_name": type(obj).__name__} if type(obj) is not set else {}),
                 }
 
             elif isinstance(obj, dict):
@@ -250,6 +269,7 @@ class Serializer:
                     "type": "dict",
                     "entries": entries,
                     "length": len(obj),
+                    **({"class_name": type(obj).__name__} if type(obj) is not dict else {}),
                 }
 
             else:

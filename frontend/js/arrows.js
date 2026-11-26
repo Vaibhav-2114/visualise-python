@@ -57,7 +57,26 @@ export class ArrowRenderer {
   }
 
   /**
-   * Ensure SVG <defs> contains arrowhead markers.
+   * Highlights edges connected to a hovered node and dims unrelated edges.
+   * @param {string} nodeId
+   */
+  highlightNodeConnections(nodeId) {
+    const connected = this.nodeEdgeIndex.get(nodeId);
+    if (!connected) return;
+    for (const [edgeId, element] of this.edgeElements) {
+      element.classList.toggle('focus-active', connected.has(edgeId));
+      element.classList.toggle('dimmed', !connected.has(edgeId));
+    }
+  }
+
+  clearConnectionFocus() {
+    for (const element of this.edgeElements.values()) {
+      element.classList.remove('dimmed', 'focus-active');
+    }
+  }
+
+  /**
+   * Ensures SVG defs contain the arrowhead markers.
    */
   ensureMarkers() {
     if (!this.svgContainer) return;
@@ -354,19 +373,26 @@ export class ArrowRenderer {
       // Case: Forward Reference (Target to the right or aligned)
       Tx = targetRect.x;
       Ty = landingY + yOffset;
-      return this.generateForwardPath(Sx, Sy, Tx, Ty, yOffset);
+      const isInteriorPort = sourceRect.x + sourceRect.width - Sx > 32;
+      return this.generateForwardPath(Sx, Sy, Tx, Ty, yOffset, isInteriorPort);
     }
   }
 
   /**
    * Standard Forward Cubic Bezier Path (Left to Right)
    */
-  generateForwardPath(Sx, Sy, Tx, Ty, yOffset = 0) {
+  generateForwardPath(Sx, Sy, Tx, Ty, yOffset = 0, isInteriorPort = false) {
     const dx = Math.abs(Tx - Sx);
-    const controlDist = Math.max(40, dx * 0.5);
+    const dy = Math.abs(Ty - Sy);
+    const controlDist = Math.min(130, Math.max(36, dx * 0.42 + dy * 0.08));
 
-    const C1x = Math.round(Sx + controlDist);
-    const C1y = Math.round(Sy + yOffset);
+    let C1x = Math.round(Sx + controlDist);
+    let C1y = Math.round(Sy + yOffset * 0.5);
+    if (isInteriorPort) {
+      const directionY = Ty >= Sy ? 1 : -1;
+      C1x = Math.round(Sx + Math.min(48, dx * 0.25));
+      C1y = Math.round(Sy + directionY * Math.min(44, Math.max(24, dy * 0.35)));
+    }
     const C2x = Math.round(Tx - controlDist);
     const C2y = Math.round(Ty + yOffset);
 
