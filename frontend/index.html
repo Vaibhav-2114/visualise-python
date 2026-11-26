@@ -15,6 +15,7 @@
       --bg-primary: #0b0f19;
       --bg-secondary: #111827;
       --bg-panel: #1e293b;
+      --bg-subbar: #162032;
       --bg-editor: #0f172a;
       --border: #334155;
       --border-active: #6366f1;
@@ -31,6 +32,39 @@
       --font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
     }
 
+    /* ===== Sleek Custom Dark Scrollbars (WebKit + Firefox) ===== */
+    * {
+      scrollbar-width: thin;
+      scrollbar-color: #334155 transparent;
+    }
+
+    ::-webkit-scrollbar {
+      width: 9px;
+      height: 9px;
+    }
+
+    ::-webkit-scrollbar-track {
+      background: #0b1120;
+    }
+
+    ::-webkit-scrollbar-thumb {
+      background-color: #334155;
+      border-radius: 999px;
+      border: 2px solid #0b1120;
+    }
+
+    ::-webkit-scrollbar-thumb:hover {
+      background-color: #475569;
+    }
+
+    ::-webkit-scrollbar-thumb:active {
+      background-color: #6366f1;
+    }
+
+    ::-webkit-scrollbar-corner {
+      background: #0b1120;
+    }
+
     html, body {
       height: 100%;
       font-family: var(--font-sans);
@@ -44,6 +78,8 @@
       display: grid;
       grid-template-rows: auto 1fr auto;
       height: 100vh;
+      height: 100dvh;
+      overflow: hidden;
     }
 
     /* ===== Top Bar ===== */
@@ -51,16 +87,20 @@
       display: flex;
       align-items: center;
       justify-content: space-between;
+      gap: 10px;
       padding: 8px 16px;
       background: var(--bg-secondary);
       border-bottom: 1px solid var(--border);
       z-index: 100;
+      min-width: 0;
     }
 
     .logo {
       display: flex;
       align-items: center;
       gap: 10px;
+      white-space: nowrap;
+      flex-shrink: 0;
     }
 
     .logo svg {
@@ -83,13 +123,16 @@
       display: flex;
       align-items: center;
       gap: 8px;
+      min-width: 0;
     }
 
     /* ===== Main Workspace ===== */
     #workspace {
       display: grid;
-      grid-template-columns: 420px 1fr;
+      grid-template-columns: 440px 1fr;
       overflow: hidden;
+      position: relative;
+      min-height: 0;
     }
 
     /* ===== Resizer Handle ===== */
@@ -97,10 +140,10 @@
       position: absolute;
       top: 0;
       bottom: 0;
-      width: 5px;
+      width: 6px;
       cursor: col-resize;
       background: transparent;
-      z-index: 50;
+      z-index: 60;
       transition: background 0.15s;
     }
     #resizer:hover, #resizer.active {
@@ -115,7 +158,10 @@
       border-right: 1px solid var(--border);
       overflow: hidden;
       position: relative;
-      min-width: 300px;
+      min-width: 260px;
+      min-height: 0;
+      container-type: inline-size;
+      container-name: left-panel;
     }
 
     /* Editor Area */
@@ -124,15 +170,19 @@
       display: flex;
       flex-direction: column;
       overflow: hidden;
+      min-height: 0;
     }
 
+    /* Clean Single-Row Header */
     .editor-header {
       display: flex;
       align-items: center;
       justify-content: space-between;
+      gap: 8px;
       padding: 8px 12px;
       background: var(--bg-panel);
       border-bottom: 1px solid var(--border);
+      flex-shrink: 0;
     }
 
     .editor-header-title {
@@ -141,6 +191,9 @@
       color: var(--text-secondary);
       text-transform: uppercase;
       letter-spacing: 0.05em;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
     }
 
     .editor-lang-badge {
@@ -151,6 +204,64 @@
       background: #1e3a5f;
       color: #38bdf8;
       border: 1px solid #0ea5e9;
+      white-space: nowrap;
+      flex-shrink: 0;
+    }
+
+    /* Compact Sub-Bar: Execution Legend + Word Wrap Checkbox */
+    .editor-subbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 4px 10px;
+      padding: 5px 12px;
+      background: var(--bg-subbar);
+      border-bottom: 1px solid rgba(51, 65, 85, 0.7);
+      flex-shrink: 0;
+    }
+
+    .editor-legend {
+      display: flex;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 4px 10px;
+      font-size: 11px;
+      font-family: var(--font-mono);
+    }
+
+    .legend-item {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      white-space: nowrap;
+    }
+
+    .legend-exec { color: #6ee7b7; }
+    .legend-next { color: #fcd34d; }
+    .legend-err  { color: #fca5a5; }
+
+    .wrap-toggle {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      font-size: 11px;
+      color: var(--text-secondary);
+      cursor: pointer;
+      user-select: none;
+      white-space: nowrap;
+      margin-left: auto;
+    }
+
+    .wrap-toggle:hover {
+      color: var(--text-primary);
+    }
+
+    .wrap-toggle input[type="checkbox"] {
+      accent-color: var(--accent);
+      width: 13px;
+      height: 13px;
+      cursor: pointer;
     }
 
     #editor-wrapper {
@@ -158,11 +269,12 @@
       display: flex;
       position: relative;
       overflow: hidden;
+      min-height: 0;
     }
 
     /* Line Numbers */
     #line-numbers {
-      width: 56px;
+      width: 54px;
       padding: 12px 0 40px 0;
       text-align: right;
       font-family: var(--font-mono);
@@ -179,7 +291,7 @@
     .line-number {
       height: 21px;
       display: flex;
-      align-items: center;
+      align-items: flex-start;
       justify-content: space-between;
       padding: 0 8px 0 6px;
       border-right: 2px solid transparent;
@@ -189,7 +301,7 @@
       font-size: 11px;
       min-width: 14px;
       text-align: left;
-      line-height: 1;
+      line-height: 21px;
     }
 
     .line-number.executed-line {
@@ -226,12 +338,16 @@
       position: relative;
       overflow: hidden;
       background: var(--bg-editor);
+      min-width: 0;
     }
 
     /* Code Highlight Overlay (behind textarea, synced via scrollTop/scrollLeft) */
     #code-highlights {
       position: absolute;
-      inset: 0;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
       padding: 12px 12px 40px 12px;
       font-family: var(--font-mono);
       font-size: 13px;
@@ -243,15 +359,28 @@
       z-index: 0;
     }
 
+    #code-highlights.word-wrap-on {
+      right: auto;
+      white-space: pre-wrap;
+      overflow-wrap: anywhere;
+      word-break: break-word;
+    }
+
     .highlight-line {
       display: block;
+      min-height: 21px;
       height: 21px;
       min-width: 100%;
       width: max-content;
       border-left: 3px solid transparent;
       margin-left: -3px;
-      padding-left: 0;
       border-radius: 2px;
+    }
+
+    #code-highlights.word-wrap-on .highlight-line {
+      height: auto;
+      width: 100%;
+      min-width: 0;
     }
 
     .highlight-line.executed-exec {
@@ -274,7 +403,8 @@
       border-left-color: var(--error);
     }
 
-    .hl-indent {
+    .hl-indent,
+    .hl-mirror {
       color: transparent;
     }
 
@@ -309,24 +439,18 @@
       word-wrap: normal;
     }
 
-    .editor-legend {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      font-size: 11px;
-      font-family: var(--font-mono);
+    #code-editor.word-wrap-on {
+      white-space: pre-wrap;
+      overflow-wrap: anywhere;
+      word-break: break-word;
+      overflow-x: hidden;
     }
-
-    .legend-item { display: inline-flex; align-items: center; gap: 4px; }
-    .legend-exec { color: #6ee7b7; }
-    .legend-next { color: #fcd34d; }
-    .legend-err  { color: #fca5a5; }
 
     #code-editor::placeholder {
       color: var(--text-muted);
     }
 
-    /* ===== Step Controls ===== */
+    /* ===== Step Controls (Responsive via Container Queries) ===== */
     #step-controls {
       padding: 10px 12px;
       background: var(--bg-panel);
@@ -334,12 +458,37 @@
       display: flex;
       flex-direction: column;
       gap: 8px;
+      flex-shrink: 0;
     }
 
-    .controls-row {
+    .controls-primary {
+      display: grid;
+      grid-template-columns: repeat(6, minmax(0, 1fr));
+      gap: 5px;
+    }
+
+    @container left-panel (max-width: 455px) {
+      .controls-primary {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+      }
+    }
+
+    @container left-panel (max-width: 290px) {
+      .controls-primary {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+    }
+
+    .controls-secondary {
       display: flex;
       align-items: center;
+      flex-wrap: wrap;
       gap: 6px;
+    }
+
+    .controls-secondary .btn {
+      flex: 1 1 auto;
+      min-width: 64px;
     }
 
     .btn {
@@ -347,13 +496,13 @@
       align-items: center;
       justify-content: center;
       gap: 4px;
-      height: 34px;
-      padding: 0 12px;
+      height: 32px;
+      padding: 0 8px;
       font-family: var(--font-sans);
-      font-size: 12px;
+      font-size: 11.5px;
       font-weight: 600;
       color: var(--text-primary);
-      background: var(--bg-panel);
+      background: var(--bg-editor);
       border: 1px solid var(--border);
       border-radius: 6px;
       cursor: pointer;
@@ -361,14 +510,17 @@
       user-select: none;
       transition: all 0.15s ease;
       white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      min-width: 0;
     }
 
-    .btn:hover {
+    .btn:hover:not(:disabled) {
       background: #334155;
       border-color: var(--accent);
     }
 
-    .btn:active {
+    .btn:active:not(:disabled) {
       transform: translateY(1px);
     }
 
@@ -383,29 +535,32 @@
       color: white;
     }
 
-    .btn-run:hover {
+    .btn-run:hover:not(:disabled) {
       background: var(--accent);
       box-shadow: 0 0 10px rgba(99, 102, 241, 0.4);
     }
 
     .btn-danger {
-      border-color: var(--error);
+      border-color: rgba(239, 68, 68, 0.7);
       color: #fca5a5;
     }
 
-    .btn-danger:hover {
-      background: rgba(239, 68, 68, 0.15);
+    .btn-danger:hover:not(:disabled) {
+      background: rgba(239, 68, 68, 0.18);
+      border-color: var(--error);
     }
 
     /* Slider */
     #step-slider-container {
       display: flex;
       align-items: center;
-      gap: 8px;
+      gap: 10px;
+      min-width: 0;
     }
 
     #step-slider {
       flex: 1;
+      min-width: 60px;
       appearance: none;
       -webkit-appearance: none;
       height: 6px;
@@ -417,8 +572,8 @@
     #step-slider::-webkit-slider-thumb {
       appearance: none;
       -webkit-appearance: none;
-      width: 16px;
-      height: 16px;
+      width: 15px;
+      height: 15px;
       border-radius: 50%;
       background: var(--accent);
       cursor: pointer;
@@ -427,8 +582,8 @@
     }
 
     #step-slider::-moz-range-thumb {
-      width: 16px;
-      height: 16px;
+      width: 15px;
+      height: 15px;
       border-radius: 50%;
       background: var(--accent);
       cursor: pointer;
@@ -436,10 +591,11 @@
     }
 
     .step-info {
-      font-size: 12px;
+      font-size: 11.5px;
       font-family: var(--font-mono);
       color: var(--text-secondary);
-      min-width: 110px;
+      white-space: nowrap;
+      flex-shrink: 0;
       text-align: right;
     }
 
@@ -449,6 +605,7 @@
       background: var(--bg-editor);
       max-height: 120px;
       overflow-y: auto;
+      flex-shrink: 0;
     }
 
     .stdout-header {
@@ -460,6 +617,8 @@
       border-bottom: 1px solid var(--border);
       cursor: pointer;
       user-select: none;
+      position: sticky;
+      top: 0;
     }
 
     .stdout-header:hover {
@@ -486,7 +645,7 @@
       line-height: 1.5;
       color: #34d399;
       white-space: pre-wrap;
-      word-break: break-all;
+      word-break: break-word;
       min-height: 20px;
     }
 
@@ -494,6 +653,8 @@
     #right-panel {
       position: relative;
       overflow: hidden;
+      min-width: 0;
+      min-height: 0;
     }
 
     /* ===== Bottom Status Bar ===== */
@@ -501,24 +662,43 @@
       display: flex;
       align-items: center;
       justify-content: space-between;
-      padding: 4px 16px;
+      gap: 12px;
+      padding: 5px 16px;
       background: var(--bg-secondary);
       border-top: 1px solid var(--border);
       font-size: 11px;
       color: var(--text-muted);
       z-index: 100;
+      min-height: 26px;
     }
 
     .status-left {
       display: flex;
       align-items: center;
       gap: 12px;
+      min-width: 0;
+      overflow: hidden;
     }
 
     .status-indicator {
       display: inline-flex;
       align-items: center;
-      gap: 4px;
+      gap: 5px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    #status-event {
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    #status-line {
+      white-space: nowrap;
+      flex-shrink: 0;
+      font-family: var(--font-mono);
     }
 
     .status-dot {
@@ -526,6 +706,7 @@
       height: 7px;
       border-radius: 50%;
       background: var(--success);
+      flex-shrink: 0;
       animation: pulse 2s infinite;
     }
 
@@ -547,14 +728,22 @@
     /* ===== Error Banner ===== */
     #error-banner {
       display: none;
-      padding: 10px 16px;
-      background: rgba(239, 68, 68, 0.12);
-      border: 1px solid rgba(239, 68, 68, 0.3);
+      padding: 8px 12px;
+      background: rgba(239, 68, 68, 0.14);
+      border: 1px solid rgba(239, 68, 68, 0.35);
       border-radius: 6px;
-      margin: 8px 12px;
+      margin: 6px 10px;
       font-family: var(--font-mono);
-      font-size: 12px;
+      font-size: 11.5px;
+      line-height: 1.4;
       color: #fca5a5;
+      cursor: pointer;
+      word-break: break-word;
+      flex-shrink: 0;
+    }
+
+    #error-banner:hover {
+      background: rgba(239, 68, 68, 0.2);
     }
 
     #error-banner.visible {
@@ -655,6 +844,7 @@
       border-radius: 6px;
       outline: none;
       cursor: pointer;
+      max-width: 210px;
     }
 
     #example-select:hover {
@@ -663,23 +853,25 @@
 
     /* ===== Speed Control ===== */
     .speed-control {
-      display: flex;
+      display: inline-flex;
       align-items: center;
       gap: 4px;
       font-size: 11px;
       color: var(--text-muted);
+      flex-shrink: 0;
     }
 
     #speed-select {
-      height: 26px;
+      height: 28px;
       padding: 0 6px;
       font-family: var(--font-mono);
       font-size: 11px;
       background: var(--bg-editor);
       color: var(--text-secondary);
       border: 1px solid var(--border);
-      border-radius: 4px;
+      border-radius: 5px;
       outline: none;
+      cursor: pointer;
     }
   </style>
 </head>
@@ -718,26 +910,32 @@
         <div id="editor-area">
           <div class="editor-header">
             <span class="editor-header-title">📝 Code Editor</span>
+            <span class="editor-lang-badge">Python 3</span>
+          </div>
+          <div class="editor-subbar">
             <div class="editor-legend">
               <span class="legend-item legend-exec">✓ Executed</span>
               <span class="legend-item legend-next">→ Next</span>
               <span class="legend-item legend-err">✕ Error</span>
             </div>
-            <span class="editor-lang-badge">Python 3</span>
+            <label class="wrap-toggle" title="Toggle word wrap in the code editor">
+              <input type="checkbox" id="toggle-wrap">
+              <span>Wrap</span>
+            </label>
           </div>
           <div id="editor-wrapper">
             <div id="line-numbers"></div>
             <div id="editor-container">
               <div id="code-highlights"></div>
-              <textarea id="code-editor" spellcheck="false" placeholder="# Write your Python code here...&#10;# Press Ctrl+Enter to run&#10;&#10;"></textarea>
+              <textarea id="code-editor" wrap="off" spellcheck="false" placeholder="# Write your Python code here...&#10;# Press Ctrl+Enter to run&#10;&#10;"></textarea>
             </div>
           </div>
-          <div id="error-banner"></div>
+          <div id="error-banner" title="Click to jump to the error line"></div>
         </div>
 
         <!-- Step Controls -->
         <div id="step-controls">
-          <div class="controls-row">
+          <div class="controls-primary">
             <button class="btn btn-run" id="btn-run" title="Run Code (Ctrl+Enter)">▶ Run</button>
             <button class="btn" id="btn-prev" disabled title="Previous Step (←)">⏮ Prev</button>
             <button class="btn" id="btn-next" disabled title="Next Step (→)">Next ⏭</button>
@@ -749,7 +947,7 @@
             <input type="range" id="step-slider" min="0" max="0" value="0" disabled>
             <span class="step-info" id="step-info">Step 0 / 0</span>
           </div>
-          <div class="controls-row">
+          <div class="controls-secondary">
             <button class="btn" id="btn-autoplay" disabled title="Auto-Play / Pause">⏯ Auto-Play</button>
             <div class="speed-control">
               <span>Speed:</span>
@@ -841,6 +1039,8 @@
     // ===== DOM Elements =====
     const codeEditor = document.getElementById('code-editor');
     const lineNumbers = document.getElementById('line-numbers');
+    const codeHighlights = document.getElementById('code-highlights');
+    const toggleWrap = document.getElementById('toggle-wrap');
     const errorBanner = document.getElementById('error-banner');
     const btnRun = document.getElementById('btn-run');
     const btnPrev = document.getElementById('btn-prev');
@@ -862,7 +1062,6 @@
     const loadingOverlay = document.getElementById('loading-overlay');
     const exampleSelect = document.getElementById('example-select');
     const stdoutHeader = document.getElementById('stdout-header');
-    const stdoutPanel = document.getElementById('stdout-panel');
 
     // Canvas toolbar
     const btnZoomIn = document.getElementById('btn-zoom-in');
@@ -883,6 +1082,8 @@
     let currentStep = 0;
     let totalSteps = 0;
     let activeErrorLine = null;
+    let lastHighlightState = { executed: null, next: null, error: null };
+    let wordWrapEnabled = false;
     let autoplayInterval = null;
     let isAutoPlaying = false;
 
@@ -893,19 +1094,19 @@ class ListNode:
     def __init__(self, val=0, next=None):
         self.val = val
         self.next = next
-        
+
 class Solution:
     def swapPairs(self, head: ListNode | None) -> ListNode | None:
         length = 0
         current = head
-        
+
         while current:
             length += 1
             current = current.next
-        
+
         if length < 2:
             return head
-        
+
         first = head
         second = first.next
         head = second
@@ -920,29 +1121,29 @@ class Solution:
                 second = temp.next
             # except AttributeError:
             #     break
-    
+
         return head
-        
+
 class List:
     def __init__ (self):
         self.head = None
-        
+
     def append(self, element):
         newnode = ListNode(element)
-        
+
         if self.head == None:
             self.head = newnode;
         else:
             current = self.head
             while current.next:
                 current = current.next
-            
+
             current.next = newnode
-    
+
     def getList(self):
         return self.head
-            
-        
+
+
 a = Solution()
 list = List()
 
@@ -956,17 +1157,17 @@ print(a.swapPairs(list.getList()))`,
       'binary-search': `def binary_search(arr, target):
     left = 0
     right = len(arr) - 1
-    
+
     while left <= right:
         mid = (left + right) // 2
-        
+
         if arr[mid] == target:
             return mid
         elif arr[mid] < target:
             left = mid + 1
         else:
             right = mid - 1
-    
+
     return -1
 
 numbers = [2, 5, 8, 12, 16, 23, 38, 56, 72, 91]
@@ -984,23 +1185,23 @@ print(f"fibonacci(5) = {result}")`,
       'stack-operations': `class Stack:
     def __init__(self):
         self.items = []
-    
+
     def push(self, item):
         self.items.append(item)
-    
+
     def pop(self):
         if not self.is_empty():
             return self.items.pop()
         return None
-    
+
     def peek(self):
         if not self.is_empty():
             return self.items[-1]
         return None
-    
+
     def is_empty(self):
         return len(self.items) == 0
-    
+
     def size(self):
         return len(self.items)
 
@@ -1033,7 +1234,7 @@ for key in student:
     def __init__(self, name, sound):
         self.name = name
         self.sound = sound
-    
+
     def speak(self):
         return f"{self.name} says {self.sound}!"
 
@@ -1041,7 +1242,7 @@ class Dog(Animal):
     def __init__(self, name):
         super().__init__(name, "Woof")
         self.tricks = []
-    
+
     def learn_trick(self, trick):
         self.tricks.append(trick)
 
@@ -1082,9 +1283,8 @@ print(f"Even squares: {evens}")
 print(f"Sum of even squares: {total}")`
     };
 
-    // ===== Line Numbers & Highlights =====
-    const codeHighlights = document.getElementById('code-highlights');
-    const LINE_HEIGHT = 21;
+    // ===== Line Numbers, Word Wrap & Highlights =====
+    const LINE_HEIGHT = 21; // exact integer px matching CSS line-height: 21px
 
     function escapeHtml(str) {
       return str
@@ -1096,7 +1296,32 @@ print(f"Sum of even squares: {total}")`
     function syncEditorScroll() {
       lineNumbers.scrollTop = codeEditor.scrollTop;
       codeHighlights.scrollTop = codeEditor.scrollTop;
-      codeHighlights.scrollLeft = codeEditor.scrollLeft;
+      codeHighlights.scrollLeft = wordWrapEnabled ? 0 : codeEditor.scrollLeft;
+    }
+
+    /**
+     * When word wrap is ON, match #code-highlights inner width to codeEditor.clientWidth
+     * and synchronize each gutter .line-number row height to its wrapped .highlight-line height.
+     */
+    function syncWrappedLineHeights() {
+      if (!wordWrapEnabled) {
+        codeHighlights.style.width = '';
+        lineNumbers.querySelectorAll('.line-number').forEach(el => {
+          el.style.height = `${LINE_HEIGHT}px`;
+        });
+        syncEditorScroll();
+        return;
+      }
+
+      codeHighlights.style.width = `${codeEditor.clientWidth}px`;
+      const hlRows = codeHighlights.querySelectorAll('.highlight-line');
+      const lnRows = lineNumbers.querySelectorAll('.line-number');
+      const count = Math.min(hlRows.length, lnRows.length);
+      for (let i = 0; i < count; i++) {
+        const h = hlRows[i].offsetHeight || LINE_HEIGHT;
+        lnRows[i].style.height = `${h}px`;
+      }
+      syncEditorScroll();
     }
 
     function updateLineNumbers() {
@@ -1107,29 +1332,52 @@ print(f"Sum of even squares: {total}")`
       }
       lineNumbers.innerHTML = html;
       activeErrorLine = null;
-      clearCodeHighlights();
+      lastHighlightState = { executed: null, next: null, error: null };
       showError(null);
-      syncEditorScroll();
+
+      // In word-wrap mode, render transparent mirror rows so gutter heights stay aligned
+      if (wordWrapEnabled) {
+        renderCodeHighlights(null, null, null);
+      } else {
+        codeHighlights.innerHTML = '';
+        syncWrappedLineHeights();
+      }
     }
 
     function clearCodeHighlights() {
-      codeHighlights.innerHTML = '';
+      lastHighlightState = { executed: null, next: null, error: null };
       lineNumbers.querySelectorAll('.line-number').forEach(el => {
         el.classList.remove('executed-line', 'next-line', 'both-line', 'error-line');
         const marker = el.querySelector('.line-marker');
         if (marker) marker.textContent = '';
       });
+      if (wordWrapEnabled) {
+        renderCodeHighlights(null, null, null);
+      } else {
+        codeHighlights.innerHTML = '';
+        syncWrappedLineHeights();
+      }
     }
 
+    /**
+     * Renders execution highlights and text-scoped red wavy error squiggle.
+     * Supports both unwrapped (single-row) and wrapped (multi-row) modes cleanly.
+     * @param {number|null} executedLine - Line that just finished executing (green ✓)
+     * @param {number|null} nextLine - Next line about to execute (amber →)
+     * @param {number|null} errorLine - Offending line with an error (red squiggle ✕)
+     */
     function renderCodeHighlights(executedLine, nextLine, errorLine) {
+      lastHighlightState = { executed: executedLine, next: nextLine, error: errorLine };
       const lines = codeEditor.value.split('\n');
       const totalLines = lines.length;
       const clampedError = errorLine ? Math.max(1, Math.min(errorLine, totalLines)) : null;
 
+      // 1. Update gutter markers & classes
       lineNumbers.querySelectorAll('.line-number').forEach(el => {
         const ln = parseInt(el.dataset.line, 10);
         el.classList.remove('executed-line', 'next-line', 'both-line', 'error-line');
         const marker = el.querySelector('.line-marker');
+
         const isErr = clampedError === ln;
         const isExec = executedLine === ln;
         const isNext = nextLine === ln;
@@ -1151,30 +1399,40 @@ print(f"Sum of even squares: {total}")`
         }
       });
 
+      // 2. Render background bars + mirrored transparent text (for squiggles and/or wrapped height)
       let html = '';
       for (let i = 1; i <= totalLines; i++) {
         const isErr = clampedError === i;
         const isExec = executedLine === i;
         const isNext = nextLine === i;
+
         let cls = 'highlight-line';
-        if (isErr) cls += ' error-exec';
-        else if (isExec && isNext) cls += ' both-exec';
-        else if (isNext) cls += ' next-exec';
-        else if (isExec) cls += ' executed-exec';
+        if (isErr) {
+          cls += ' error-exec';
+        } else if (isExec && isNext) {
+          cls += ' both-exec';
+        } else if (isNext) {
+          cls += ' next-exec';
+        } else if (isExec) {
+          cls += ' executed-exec';
+        }
+
+        const lineText = lines[i - 1] || '';
 
         if (isErr) {
-          const lineText = lines[i - 1] || '';
           const match = lineText.match(/^(\s*)(.*)$/);
           const indent = escapeHtml(match ? match[1] : '');
           const codeText = match && match[2] ? escapeHtml(match[2]) : '   ';
           html += `<div class="${cls}"><span class="hl-indent">${indent}</span><span class="error-squiggle">${codeText}</span></div>`;
+        } else if (wordWrapEnabled) {
+          html += `<div class="${cls}"><span class="hl-mirror">${escapeHtml(lineText) || ' '}</span></div>`;
         } else {
           html += `<div class="${cls}"></div>`;
         }
       }
 
       codeHighlights.innerHTML = html;
-      syncEditorScroll();
+      syncWrappedLineHeights();
     }
 
     function highlightLines(executedLine, nextLine, errorLine = activeErrorLine) {
@@ -1184,7 +1442,9 @@ print(f"Sum of even squares: {total}")`
       }
       renderCodeHighlights(executedLine, nextLine, errorLine);
       const focusLine = nextLine || executedLine || errorLine;
-      if (focusLine) scrollEditorToLine(focusLine);
+      if (focusLine) {
+        scrollEditorToLine(focusLine);
+      }
     }
 
     function highlightErrorLine(lineNo) {
@@ -1197,7 +1457,15 @@ print(f"Sum of even squares: {total}")`
     function scrollEditorToLine(lineNo) {
       const totalLines = codeEditor.value.split('\n').length;
       const clamped = Math.max(1, Math.min(lineNo, totalLines));
-      const lineTop = (clamped - 1) * LINE_HEIGHT;
+
+      let lineTop = (clamped - 1) * LINE_HEIGHT;
+      if (wordWrapEnabled) {
+        const hlRow = codeHighlights.children[clamped - 1];
+        if (hlRow) {
+          lineTop = Math.max(0, hlRow.offsetTop - 12);
+        }
+      }
+
       const editorHeight = codeEditor.clientHeight;
       const editorPadding = 12;
       const visibleTop = codeEditor.scrollTop;
@@ -1209,12 +1477,42 @@ print(f"Sum of even squares: {total}")`
       syncEditorScroll();
     }
 
+    function setWordWrap(enabled) {
+      wordWrapEnabled = Boolean(enabled);
+      codeEditor.setAttribute('wrap', wordWrapEnabled ? 'soft' : 'off');
+      codeEditor.classList.toggle('word-wrap-on', wordWrapEnabled);
+      codeHighlights.classList.toggle('word-wrap-on', wordWrapEnabled);
+      if (wordWrapEnabled) {
+        codeEditor.scrollLeft = 0;
+      }
+      renderCodeHighlights(
+        lastHighlightState.executed,
+        lastHighlightState.next,
+        lastHighlightState.error
+      );
+    }
+
+    toggleWrap.addEventListener('change', (e) => {
+      setWordWrap(e.target.checked);
+    });
+
+    // Keep wrapped heights and highlights synced when side panel or window resizes
+    if (typeof ResizeObserver !== 'undefined') {
+      const editorResizeObserver = new ResizeObserver(() => {
+        if (wordWrapEnabled) {
+          syncWrappedLineHeights();
+        }
+      });
+      editorResizeObserver.observe(codeEditor);
+    }
+
+    // Load Default Example
     codeEditor.value = EXAMPLES['linked-list-swap'];
     updateLineNumbers();
+
     codeEditor.addEventListener('input', updateLineNumbers);
     codeEditor.addEventListener('scroll', syncEditorScroll);
 
-    errorBanner.style.cursor = 'pointer';
     errorBanner.addEventListener('click', () => {
       if (activeErrorLine) {
         scrollEditorToLine(activeErrorLine);
@@ -1239,7 +1537,6 @@ print(f"Sum of even squares: {total}")`
       const rawCode = codeEditor.value;
       if (!rawCode.trim()) return;
 
-      // Clear previous state
       resetVisualization();
       showError(null);
       setStatus('running', 'Tracing execution...');
@@ -1250,7 +1547,6 @@ print(f"Sum of even squares: {total}")`
         const response = await fetch('/api/trace', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          // Send untrimmed rawCode so leading blank lines preserve exact line numbers
           body: JSON.stringify({ code: rawCode, max_steps: 1000 })
         });
 
@@ -1262,16 +1558,13 @@ print(f"Sum of even squares: {total}")`
           currentStep = 0;
           activeErrorLine = null;
 
-          // Enable controls
           enableStepControls(true);
           stepSlider.max = totalSteps - 1;
           stepSlider.value = 0;
 
-          // Render first step
           renderCurrentStep();
           setStatus('ok', `Traced ${totalSteps} steps`);
 
-          // Fit to view after initial render
           setTimeout(() => canvasManager.fitToView(), 100);
         } else if (data.status === 'error') {
           const err = data.error || {};
@@ -1312,8 +1605,12 @@ print(f"Sum of even squares: {total}")`
       const step = traceData.steps[currentStep];
       canvasManager.renderStep(step);
 
+      // Exact sys.settrace line semantics:
+      // 'line' and 'call' fire BEFORE executing step.line;
+      // 'return' and 'exception' fire AFTER executing step.line.
       let executedLineNo = null;
       let nextLineNo = null;
+
       if (step.event === 'return' || step.event === 'exception') {
         executedLineNo = step.line;
         if (currentStep + 1 < totalSteps) {
@@ -1330,18 +1627,13 @@ print(f"Sum of even squares: {total}")`
       const stepErrorLine = step.event === 'exception' ? step.line : activeErrorLine;
       highlightLines(executedLineNo, nextLineNo, stepErrorLine);
 
-      // Update stdout
       stdoutContent.textContent = step.stdout || '(no output)';
-
-      // Update step info
       stepInfo.textContent = `Step ${currentStep + 1} / ${totalSteps}`;
       stepSlider.value = currentStep;
 
-      // Update status
       statusEvent.textContent = `Event: ${step.event || '—'} | Func: ${step.func_name || '—'}`;
       statusLine.textContent = `Executed: ${executedLineNo ?? '—'} | Next: ${nextLineNo ?? '—'}`;
 
-      // Update button states
       btnPrev.disabled = currentStep <= 0;
       btnFirst.disabled = currentStep <= 0;
       btnNext.disabled = currentStep >= totalSteps - 1;
@@ -1385,7 +1677,7 @@ print(f"Sum of even squares: {total}")`
       isAutoPlaying = true;
       btnAutoplay.textContent = '⏸ Pause';
       btnAutoplay.classList.add('btn-run');
-      const speed = parseInt(speedSelect.value);
+      const speed = parseInt(speedSelect.value, 10);
       autoplayInterval = setInterval(() => {
         if (currentStep >= totalSteps - 1) {
           stopAutoPlay();
@@ -1415,7 +1707,6 @@ print(f"Sum of even squares: {total}")`
 
       canvasManager.clear();
 
-      // Reset controls
       enableStepControls(false);
       stepSlider.max = 0;
       stepSlider.value = 0;
@@ -1469,7 +1760,7 @@ print(f"Sum of even squares: {total}")`
     btnRealign.addEventListener('click', () => canvasManager.realignAutoLayout());
 
     stepSlider.addEventListener('input', (e) => {
-      goToStep(parseInt(e.target.value));
+      goToStep(parseInt(e.target.value, 10));
     });
 
     speedSelect.addEventListener('change', () => {
@@ -1527,7 +1818,8 @@ print(f"Sum of even squares: {total}")`
 
     // ===== Keyboard Shortcuts =====
     document.addEventListener('keydown', (e) => {
-      const inFormControl = ['TEXTAREA', 'INPUT', 'SELECT'].includes(document.activeElement?.tagName);
+      const tag = document.activeElement?.tagName;
+      const inFormControl = tag === 'TEXTAREA' || tag === 'INPUT' || tag === 'SELECT';
 
       if (e.key === 'Escape') {
         document.getElementById('shortcuts-modal').classList.remove('visible');
@@ -1574,17 +1866,30 @@ print(f"Sum of even squares: {total}")`
       }
     });
 
-    // ===== Panel Resizer =====
+    // ===== Panel Resizer (Responsive & Clamped) =====
     const resizer = document.getElementById('resizer');
     const leftPanel = document.getElementById('left-panel');
     const workspace = document.getElementById('workspace');
     let isResizing = false;
 
-    function updateResizerPosition() {
-      resizer.style.left = leftPanel.offsetWidth - 2 + 'px';
+    function clampPanelWidth(desiredWidth) {
+      const workspaceWidth = workspace.getBoundingClientRect().width;
+      const minLeft = 260;
+      const maxLeft = Math.max(minLeft, workspaceWidth - 320);
+      return Math.max(minLeft, Math.min(desiredWidth, maxLeft));
     }
+
+    function updateResizerPosition() {
+      resizer.style.left = `${leftPanel.offsetWidth - 3}px`;
+    }
+
     updateResizerPosition();
-    window.addEventListener('resize', updateResizerPosition);
+
+    window.addEventListener('resize', () => {
+      const clamped = clampPanelWidth(leftPanel.offsetWidth);
+      workspace.style.gridTemplateColumns = `${clamped}px 1fr`;
+      updateResizerPosition();
+    });
 
     resizer.addEventListener('pointerdown', (e) => {
       isResizing = true;
@@ -1596,8 +1901,7 @@ print(f"Sum of even squares: {total}")`
     window.addEventListener('pointermove', (e) => {
       if (!isResizing) return;
       const workspaceRect = workspace.getBoundingClientRect();
-      let newWidth = e.clientX - workspaceRect.left;
-      newWidth = Math.max(300, Math.min(newWidth, workspaceRect.width - 400));
+      const newWidth = clampPanelWidth(e.clientX - workspaceRect.left);
       workspace.style.gridTemplateColumns = `${newWidth}px 1fr`;
       updateResizerPosition();
     });
@@ -1609,7 +1913,7 @@ print(f"Sum of even squares: {total}")`
       }
     });
 
-    // Theme info button (shows a brief tooltip)
+    // Theme info button
     document.getElementById('btn-theme').addEventListener('click', () => {
       alert('🎨 Python Visualizer\n\nDark theme with interactive canvas.\n\n• Drag any element on the canvas\n• Pan by dragging the background\n• Zoom with mouse wheel\n• Use keyboard shortcuts for step navigation\n\nBuilt with zero external dependencies.');
     });
